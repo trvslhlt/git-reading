@@ -15,14 +15,24 @@ dev = [
 ]
 
 [project.scripts]
-index-readings = "index_readings:main"
+extract-readings = "extract.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = [
+    "src/extract",
+    "src/enrich",
+    "src/load",
+    "src/normalize_source",
+    "src/query",
+    "src/transform",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [tool.ruff]
 line-length = 100
@@ -48,7 +58,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["index_readings"]
+known-first-party = ["extract", "enrich", "load", "normalize_source", "query", "transform"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B", "F401", "F811"]

@@ -7,16 +7,11 @@ commit them with specific dates, and verify the indexing works correctly.
 
 import json
 import subprocess
-import sys
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from index_readings import index_notes
+from extract.main import index_notes
 
 
 @pytest.fixture
