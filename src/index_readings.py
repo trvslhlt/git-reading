@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""
+Index reading notes into a queryable JSON structure.
+
+Scans markdown files, parses book titles and sections, and uses git history
+to determine when each book was read (based on when the title was added).
+
+Usage:
+    python index_readings.py [--notes-dir PATH] [--git-dir PATH] [--output PATH]
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+
+def get_git_date_for_line(filepath: Path, line_content: str, repo_root: Path) -> str | None:
+    """
+    Use git blame to find when a specific line was added.
+    Returns ISO date string or None if not in git history.
+    """
+    try:
+        # Get relative path from repo root
+        rel_path = filepath.relative_to(repo_root)
+        
+        # Run git blame with porcelain format for easy parsing
+        result = subprocess.run(
+            ["git", "blame", "--porcelain", "-L", f"/{re.escape(line_content)}/", "--", str(rel_path)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        
+        if result.returncode != 0:
+            return None
+        
+        # Parse the porcelain output for author-time
+        for line in result.stdout.split("\n"):
+            if line.startswith("author-time "):
+                timestamp = int(line.split(" ")[1])
+                return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+        
+        return None
+    except Exception:
+        return None
+
+
+def find_git_root(start_path: Path) -> Path | None:
+    """Find the git repository root from a starting path."""
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    return None
+
+
+def author_from_filename(filename: str) -> str:
+    """
+    Convert filename to author name.
+    e.g., 'barth_john.md' -> 'John Barth'
+    """
+    stem = Path(filename).stem  # Remove .md
+    parts = stem.split("_")
+    if len(parts) >= 2:
+        # Assume format: lastname_firstname.md
+        # Capitalize each part and reverse order
+        return " ".join(part.capitalize() for part in reversed(parts))
+    else:
+        return stem.capitalize()
+
+
+def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
+    """
+    Parse a markdown file and extract all books with their sections.
+    Returns a list of book dictionaries.
+    """
+    content = filepath.read_text(encoding="utf-8")
+    lines = content.split("\n")
+    
+    author = author_from_filename(filepath.name)
+    books = []
+    current_book = None
+    current_section = None
+    current_section_items = []
+    
+    def save_current_section():
+        """Save the current section to the current book."""
+        nonlocal current_section, current_section_items
+        if current_book and current_section and current_section_items:
+            section_key = current_section.lower().strip()
+            current_book["sections"][section_key] = current_section_items
+        current_section = None
+        current_section_items = []
+    
+    def save_current_book():
+        """Save the current book to the books list."""
+        nonlocal current_book
+        save_current_section()
+        if current_book:
+            books.append(current_book)
+        current_book = None
+    
+    # Section names that shouldn't be treated as book titles
+    section_names = {
+        "terms", "notes", "excerpts", "threads", "ideas", "representations",
+        "images", "same time", "thread", "note", "excerpt", "term"
+    }
+    
+    for line in lines:
+        # Check for book title (# Title)
+        if line.startswith("# ") and not line.startswith("## "):
+            potential_title = line[2:].strip()
+            
+            # Skip if this looks like a section name, not a book title
+            if potential_title.lower() in section_names:
+                # Treat it as a section under the current book
+                save_current_section()
+                current_section = potential_title
+                current_section_items = []
+                continue
+            
+            save_current_book()
+            title = potential_title
+            
+            # Get git date for this book
+            date_read = None
+            if repo_root:
+                date_read = get_git_date_for_line(filepath, line, repo_root)
+            
+            current_book = {
+                "title": title,
+                "author": author,
+                "date_read": date_read,
+                "source_file": filepath.name,
+                "sections": {},
+            }
+        
+        # Check for section header (## Section)
+        elif line.startswith("## "):
+            save_current_section()
+            current_section = line[3:].strip()
+            current_section_items = []
+        
+        # Content line (could be a list item or paragraph)
+        elif current_book and current_section:
+            stripped = line.strip()
+            if stripped:
+                # Handle list items (- item) or plain lines
+                if stripped.startswith("- "):
+                    current_section_items.append(stripped[2:])
+                else:
+                    current_section_items.append(stripped)
+    
+    # Don't forget the last book/section
+    save_current_book()
+    
+    return books
+
+
+def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None):
+    """
+    Scan all markdown files and build the index.
+
+    Args:
+        notes_dir: Directory containing markdown notes
+        output_path: Path to write the JSON index
+        git_dir: Git repository directory (if None, will search from notes_dir)
+    """
+    notes_dir = notes_dir.resolve()
+
+    # Determine git repository root
+    if git_dir:
+        repo_root = git_dir.resolve()
+        if not (repo_root / ".git").exists():
+            print(f"Warning: {repo_root} does not appear to be a git repository")
+            print("Date information will not be available.")
+            repo_root = None
+    else:
+        repo_root = find_git_root(notes_dir)
+        if not repo_root:
+            print(f"Warning: No git repository found at or above {notes_dir}")
+            print("Date information will not be available.")
+
+    all_books = []
+    md_files = sorted(notes_dir.glob("*.md"))
+    
+    if not md_files:
+        print(f"No markdown files found in {notes_dir}")
+        return
+    
+    print(f"Found {len(md_files)} markdown file(s)")
+    
+    for md_file in md_files:
+        print(f"  Parsing {md_file.name}...")
+        books = parse_markdown_file(md_file, repo_root)
+        all_books.extend(books)
+        print(f"    Found {len(books)} book(s)")
+    
+    # Sort by date_read (None values at end)
+    all_books.sort(key=lambda b: (b["date_read"] is None, b["date_read"] or ""))
+    
+    index = {
+        "generated_at": datetime.now().isoformat(),
+        "notes_directory": str(notes_dir),
+        "total_books": len(all_books),
+        "books": all_books,
+    }
+    
+    output_path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\nWrote index with {len(all_books)} books to {output_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Index reading notes into a queryable JSON structure."
+    )
+    parser.add_argument(
+        "--notes-dir",
+        type=Path,
+        default=Path("."),
+        help="Directory containing markdown notes (default: current directory)",
+    )
+    parser.add_argument(
+        "--git-dir",
+        type=Path,
+        default=None,
+        help="Git repository directory (default: auto-detect from notes-dir)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("book_index.json"),
+        help="Output JSON file path (default: book_index.json)",
+    )
+
+    args = parser.parse_args()
+
+    if not args.notes_dir.is_dir():
+        print(f"Error: {args.notes_dir} is not a directory")
+        return 1
+
+    if args.git_dir and not args.git_dir.is_dir():
+        print(f"Error: {args.git_dir} is not a directory")
+        return 1
+
+    index_notes(args.notes_dir, args.output, args.git_dir)
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())
