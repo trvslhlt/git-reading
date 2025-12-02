@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import json
-import os
 import re
 import subprocess
 from datetime import datetime
@@ -26,24 +25,32 @@ def get_git_date_for_line(filepath: Path, line_content: str, repo_root: Path) ->
     try:
         # Get relative path from repo root
         rel_path = filepath.relative_to(repo_root)
-        
+
         # Run git blame with porcelain format for easy parsing
         result = subprocess.run(
-            ["git", "blame", "--porcelain", "-L", f"/{re.escape(line_content)}/", "--", str(rel_path)],
+            [
+                "git",
+                "blame",
+                "--porcelain",
+                "-L",
+                f"/{re.escape(line_content)}/",
+                "--",
+                str(rel_path),
+            ],
             cwd=repo_root,
             capture_output=True,
             text=True,
         )
-        
+
         if result.returncode != 0:
             return None
-        
+
         # Parse the porcelain output for author-time
         for line in result.stdout.split("\n"):
             if line.startswith("author-time "):
                 timestamp = int(line.split(" ")[1])
                 return datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
-        
+
         return None
     except Exception:
         return None
@@ -81,13 +88,13 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
     """
     content = filepath.read_text(encoding="utf-8")
     lines = content.split("\n")
-    
+
     author = author_from_filename(filepath.name)
     books = []
     current_book = None
     current_section = None
     current_section_items = []
-    
+
     def save_current_section():
         """Save the current section to the current book."""
         nonlocal current_section, current_section_items
@@ -96,7 +103,7 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
             current_book["sections"][section_key] = current_section_items
         current_section = None
         current_section_items = []
-    
+
     def save_current_book():
         """Save the current book to the books list."""
         nonlocal current_book
@@ -104,18 +111,28 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
         if current_book:
             books.append(current_book)
         current_book = None
-    
+
     # Section names that shouldn't be treated as book titles
     section_names = {
-        "terms", "notes", "excerpts", "threads", "ideas", "representations",
-        "images", "same time", "thread", "note", "excerpt", "term"
+        "terms",
+        "notes",
+        "excerpts",
+        "threads",
+        "ideas",
+        "representations",
+        "images",
+        "same time",
+        "thread",
+        "note",
+        "excerpt",
+        "term",
     }
-    
+
     for line in lines:
         # Check for book title (# Title)
         if line.startswith("# ") and not line.startswith("## "):
             potential_title = line[2:].strip()
-            
+
             # Skip if this looks like a section name, not a book title
             if potential_title.lower() in section_names:
                 # Treat it as a section under the current book
@@ -123,15 +140,15 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
                 current_section = potential_title
                 current_section_items = []
                 continue
-            
+
             save_current_book()
             title = potential_title
-            
+
             # Get git date for this book
             date_read = None
             if repo_root:
                 date_read = get_git_date_for_line(filepath, line, repo_root)
-            
+
             current_book = {
                 "title": title,
                 "author": author,
@@ -139,13 +156,13 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
                 "source_file": filepath.name,
                 "sections": {},
             }
-        
+
         # Check for section header (## Section)
         elif line.startswith("## "):
             save_current_section()
             current_section = line[3:].strip()
             current_section_items = []
-        
+
         # Content line (could be a list item or paragraph)
         elif current_book and current_section:
             stripped = line.strip()
@@ -155,10 +172,10 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
                     current_section_items.append(stripped[2:])
                 else:
                     current_section_items.append(stripped)
-    
+
     # Don't forget the last book/section
     save_current_book()
-    
+
     return books
 
 
@@ -188,29 +205,29 @@ def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None)
 
     all_books = []
     md_files = sorted(notes_dir.glob("*.md"))
-    
+
     if not md_files:
         print(f"No markdown files found in {notes_dir}")
         return
-    
+
     print(f"Found {len(md_files)} markdown file(s)")
-    
+
     for md_file in md_files:
         print(f"  Parsing {md_file.name}...")
         books = parse_markdown_file(md_file, repo_root)
         all_books.extend(books)
         print(f"    Found {len(books)} book(s)")
-    
+
     # Sort by date_read (None values at end)
     all_books.sort(key=lambda b: (b["date_read"] is None, b["date_read"] or ""))
-    
+
     index = {
         "generated_at": datetime.now().isoformat(),
         "notes_directory": str(notes_dir),
         "total_books": len(all_books),
         "books": all_books,
     }
-    
+
     output_path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nWrote index with {len(all_books)} books to {output_path}")
 

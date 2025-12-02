@@ -1,0 +1,29 @@
+{
+  // Python interpreter
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+
+  // Formatting with Ruff
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports.ruff": "explicit",
+      "source.fixAll.ruff": "explicit"
+    }
+  },
+
+  // Python analysis
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "error",
+    "reportUndefinedVariable": "error"
+  },
+
+  // File associations
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true
+  }
+}
