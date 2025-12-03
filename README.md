@@ -106,7 +106,7 @@ The generated JSON includes:
 
 ### Project Setup
 
-This project uses [uv](https://github.com/astral-sh/uv) for dependency management:
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management and Make for development tasks:
 
 ```bash
 # Clone the repository
@@ -114,17 +114,37 @@ git clone <repo-url>
 cd git-reading
 
 # Install dependencies and the package
-uv pip install -e . && uv pip install pytest ruff
-
-# Or for a clean install
-uv sync --extra dev --extra test && uv pip install .
+make dev-install
 ```
 
-**Note**: Due to a current limitation with uv's handling of `.pth` files in editable installs with src layouts, you may need to reinstall the package after making changes:
+### Development Workflow
+
+The project includes a Makefile for common development tasks:
 
 ```bash
-uv pip install .
+# Run with current source code (no install needed - best for development)
+make run ARGS="--notes-dir /path/to/notes --output index.json"
+
+# Install the package (needed after making changes to test installed version)
+make install
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Lint code
+make lint
+
+# Clean build artifacts
+make clean
+
+# Show all available commands
+make help
 ```
+
+**Key tip**: Use `make run` during development to run your current source code without reinstalling. This bypasses the uv `.pth` file limitation.
 
 ### Project Structure
 
@@ -146,6 +166,7 @@ git-reading/
 │       └── __init__.py
 ├── tests/
 │   └── test_integration.py # Integration tests
+├── Makefile                 # Development task automation
 ├── pyproject.toml           # Project config, dependencies, tool settings
 ├── pytest.ini               # Test configuration
 └── .vscode/
