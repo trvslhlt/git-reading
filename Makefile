@@ -1,4 +1,4 @@
-.PHONY: help install test lint format clean run run-extract run-query run-transform dev-install
+.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns dev-install
 
 help:
 	@echo "Available commands:"
@@ -12,11 +12,15 @@ help:
 	@echo "Run commands (use current source code, no install needed):"
 	@echo "  make run              - Show available run commands"
 	@echo "  make run-extract      - Run extract-readings command"
+	@echo "  make run-validate     - Run validation on markdown files"
+	@echo "  make run-learn-patterns - Learn patterns from markdown corpus"
 	@echo "  make run-query        - Run query command (when implemented)"
 	@echo "  make run-transform    - Run transform command (when implemented)"
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
+	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
+	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
 
 install:
@@ -53,6 +57,14 @@ clean:
 run-extract:
 	PYTHONPATH=src uv run extract-readings $(ARGS)
 
+# Validate command - validate markdown files
+run-validate:
+	PYTHONPATH=src uv run python -m normalize_source.main validate $(ARGS)
+
+# Learn patterns command - learn patterns from corpus
+run-learn-patterns:
+	PYTHONPATH=src uv run python -m normalize_source.main learn $(ARGS)
+
 # Query command (placeholder for future implementation)
 run-query:
 	@echo "Query command not yet implemented"
@@ -67,12 +79,17 @@ run-transform:
 run:
 	@echo "Available run commands:"
 	@echo ""
-	@echo "  make run-extract ARGS='...'    - Run extract-readings command"
-	@echo "  make run-query ARGS='...'      - Run query command (not yet implemented)"
-	@echo "  make run-transform ARGS='...'  - Run transform command (not yet implemented)"
+	@echo "  make run-extract ARGS='...'         - Run extract-readings command"
+	@echo "  make run-validate ARGS='...'        - Validate markdown files"
+	@echo "  make run-learn-patterns ARGS='...'  - Learn patterns from corpus"
+	@echo "  make run-query ARGS='...'           - Run query command (not yet implemented)"
+	@echo "  make run-transform ARGS='...'       - Run transform command (not yet implemented)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
+	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
+	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
+	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
 	@echo ""
 	@echo "Tip: These commands run your current source code without reinstalling."
