@@ -10,15 +10,14 @@ help:
 	@echo "  make clean            - Clean build artifacts"
 	@echo ""
 	@echo "Run commands (use current source code, no install needed):"
+	@echo "  make run              - Show available run commands"
 	@echo "  make run-extract      - Run extract-readings command"
 	@echo "  make run-query        - Run query command (when implemented)"
 	@echo "  make run-transform    - Run transform command (when implemented)"
-	@echo "  make run              - Alias for run-extract"
 	@echo ""
 	@echo "Usage examples:"
 	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
 	@echo "  make run-extract ARGS='--help'"
-	@echo "  make run ARGS='--help'  # same as run-extract"
 
 install:
 	uv pip install .
@@ -64,5 +63,16 @@ run-transform:
 	@echo "Transform command not yet implemented"
 	@echo "When ready, will run: PYTHONPATH=src uv run transform-readings $(ARGS)"
 
-# Default run command (alias for run-extract)
-run: run-extract
+# Show available run commands when 'make run' is called without a specific target
+run:
+	@echo "Available run commands:"
+	@echo ""
+	@echo "  make run-extract ARGS='...'    - Run extract-readings command"
+	@echo "  make run-query ARGS='...'      - Run query command (not yet implemented)"
+	@echo "  make run-transform ARGS='...'  - Run transform command (not yet implemented)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
+	@echo "  make run-extract ARGS='--help'"
+	@echo ""
+	@echo "Tip: These commands run your current source code without reinstalling."

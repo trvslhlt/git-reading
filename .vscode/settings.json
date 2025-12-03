@@ -12,12 +12,27 @@
     }
   },
 
-  // Python analysis
-  "python.analysis.typeCheckingMode": "basic",
+  // Ruff extension settings
+  "ruff.enable": true,
+  "ruff.lint.enable": true,
+  "ruff.importStrategy": "fromEnvironment",
+
+  // Disable Pylance linting in favor of Ruff
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticMode": "openFilesOnly",
   "python.analysis.autoImportCompletions": true,
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.completeFunctionParens": true,
   "python.analysis.diagnosticSeverityOverrides": {
+    // Turn off style/linting checks (Ruff handles these)
+    "reportUnusedImport": "none",
+    "reportUnusedVariable": "none",
+    "reportUnusedFunction": "none",
+    "reportUnusedClass": "none",
+    "reportUndefinedVariable": "none",
+    // Keep only critical errors
     "reportMissingImports": "error",
-    "reportUndefinedVariable": "error"
+    "reportAttributeAccessIssue": "none"
   },
 
   // File associations

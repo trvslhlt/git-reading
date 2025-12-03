@@ -123,10 +123,10 @@ The project includes a Makefile for common development tasks:
 
 ```bash
 # Run commands with current source code (no install needed - best for development)
+make run                                   # Show available run commands
 make run-extract ARGS="--notes-dir /path/to/notes --output index.json"
 make run-query ARGS="query arguments"      # When query is implemented
 make run-transform ARGS="transform args"   # When transform is implemented
-make run ARGS="..."                        # Alias for run-extract
 
 # Install the package (needed after making changes to test installed version)
 make install
