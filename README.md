@@ -122,8 +122,11 @@ make dev-install
 The project includes a Makefile for common development tasks:
 
 ```bash
-# Run with current source code (no install needed - best for development)
-make run ARGS="--notes-dir /path/to/notes --output index.json"
+# Run commands with current source code (no install needed - best for development)
+make run-extract ARGS="--notes-dir /path/to/notes --output index.json"
+make run-query ARGS="query arguments"      # When query is implemented
+make run-transform ARGS="transform args"   # When transform is implemented
+make run ARGS="..."                        # Alias for run-extract
 
 # Install the package (needed after making changes to test installed version)
 make install
@@ -144,7 +147,10 @@ make clean
 make help
 ```
 
-**Key tip**: Use `make run` during development to run your current source code without reinstalling. This bypasses the uv `.pth` file limitation.
+**Key tips**:
+- Use `make run-*` commands during development to run your current source code without reinstalling
+- Each module can have its own run command (e.g., `run-extract`, `run-query`, `run-transform`)
+- This bypasses the uv `.pth` file limitation and makes development much faster
 
 ### Project Structure
 

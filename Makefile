@@ -1,18 +1,24 @@
-.PHONY: help install test lint format clean run dev-install
+.PHONY: help install test lint format clean run run-extract run-query run-transform dev-install
 
 help:
 	@echo "Available commands:"
-	@echo "  make install      - Install the package"
-	@echo "  make dev-install  - Install dev dependencies"
-	@echo "  make test         - Run tests"
-	@echo "  make lint         - Run linter"
-	@echo "  make format       - Format code"
-	@echo "  make clean        - Clean build artifacts"
-	@echo "  make run          - Run with current source code (no install needed)"
+	@echo "  make install          - Install the package"
+	@echo "  make dev-install      - Install dev dependencies"
+	@echo "  make test             - Run tests"
+	@echo "  make lint             - Run linter"
+	@echo "  make format           - Format code"
+	@echo "  make clean            - Clean build artifacts"
+	@echo ""
+	@echo "Run commands (use current source code, no install needed):"
+	@echo "  make run-extract      - Run extract-readings command"
+	@echo "  make run-query        - Run query command (when implemented)"
+	@echo "  make run-transform    - Run transform command (when implemented)"
+	@echo "  make run              - Alias for run-extract"
 	@echo ""
 	@echo "Usage examples:"
-	@echo "  make run ARGS='--notes-dir /path/to/notes --output index.json'"
-	@echo "  make run ARGS='--help'"
+	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
+	@echo "  make run-extract ARGS='--help'"
+	@echo "  make run ARGS='--help'  # same as run-extract"
 
 install:
 	uv pip install .
@@ -41,7 +47,22 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-# Run with current source code without reinstalling
-# Usage: make run ARGS="--notes-dir /path/to/notes"
-run:
-	PYTHONPATH=src uv run python -m extract.main $(ARGS)
+# Run commands with current source code without reinstalling
+# These use PYTHONPATH=src to run code directly from source
+
+# Extract command - index reading notes
+run-extract:
+	PYTHONPATH=src uv run extract-readings $(ARGS)
+
+# Query command (placeholder for future implementation)
+run-query:
+	@echo "Query command not yet implemented"
+	@echo "When ready, will run: PYTHONPATH=src uv run query-readings $(ARGS)"
+
+# Transform command (placeholder for future implementation)
+run-transform:
+	@echo "Transform command not yet implemented"
+	@echo "When ready, will run: PYTHONPATH=src uv run transform-readings $(ARGS)"
+
+# Default run command (alias for run-extract)
+run: run-extract
