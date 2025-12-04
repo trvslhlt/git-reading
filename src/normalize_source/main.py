@@ -39,10 +39,40 @@ def cmd_validate(args):
     reporter = ValidationReporter(show_info=args.show_info)
 
     if args.format == "json":
-        print(reporter.report_json(results))
-        return 0
+        output = reporter.report_json(results)
+        if args.output:
+            output_path = Path(args.output)
+            output_path.write_text(output, encoding="utf-8")
+            print(f"Validation results written to {output_path}")
+            return 0
+        else:
+            print(output)
+            return 0
     else:
-        return reporter.report_console(results)
+        # For console format, we can also optionally save to file
+        if args.output:
+            # Capture console output to file
+            import io
+            import sys
+
+            output_path = Path(args.output)
+            old_stdout = sys.stdout
+            sys.stdout = buffer = io.StringIO()
+
+            try:
+                exit_code = reporter.report_console(results)
+                output = buffer.getvalue()
+                output_path.write_text(output, encoding="utf-8")
+
+                # Also print to console
+                sys.stdout = old_stdout
+                print(output, end="")
+                print(f"\nValidation results also written to {output_path}")
+                return exit_code
+            finally:
+                sys.stdout = old_stdout
+        else:
+            return reporter.report_console(results)
 
 
 def cmd_learn(args):
@@ -102,6 +132,11 @@ def main():
         choices=["console", "json"],
         default="console",
         help="Output format",
+    )
+    validate_parser.add_argument(
+        "--output",
+        type=str,
+        help="Write validation results to file (in addition to console for console format)",
     )
     validate_parser.add_argument(
         "--show-info",

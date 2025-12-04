@@ -20,7 +20,10 @@ help:
 	@echo "Usage examples:"
 	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
+	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
+	@echo "  make run-validate ARGS='--format json --output validation.json'"
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
+	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
 
 install:
@@ -88,6 +91,8 @@ run:
 	@echo "Examples:"
 	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
+	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
+	@echo "  make run-validate ARGS='--format json --output validation.json'"
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
