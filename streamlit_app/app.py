@@ -34,14 +34,12 @@ def main():
         st.header("Configuration")
         index_path = st.text_input(
             "Index JSON Path",
-            value="index.json",
+            value=".tmp/index.json",
             help="Path to the generated index.json file",
         )
         st.markdown("---")
         st.markdown("**About**")
-        st.markdown(
-            "This app visualizes your reading notes extracted from markdown files."
-        )
+        st.markdown("This app visualizes your reading notes extracted from markdown files.")
 
     # Load data
     data = load_index(Path(index_path))
@@ -72,8 +70,7 @@ def main():
 
     with col4:
         total_items = sum(
-            sum(len(items) for items in book.get("sections", {}).values())
-            for book in books
+            sum(len(items) for items in book.get("sections", {}).values()) for book in books
         )
         st.metric("Total Items", total_items)
 
@@ -141,9 +138,7 @@ def main():
                 st.markdown("---")
                 tabs = st.tabs(list(sections.keys()))
 
-                for tab, (section_name, items) in zip(
-                    tabs, sections.items(), strict=True
-                ):
+                for tab, (section_name, items) in zip(tabs, sections.items(), strict=True):
                     with tab:
                         if items:
                             for idx, item in enumerate(items, 1):
@@ -165,7 +160,51 @@ def main():
         if dated_books:
             dated_books.sort(key=lambda x: x[1])
 
-            # Create a simple timeline visualization
+            # Time period histogram
+            st.subheader("Reading Activity Over Time")
+
+            col1, col2 = st.columns([3, 1])
+
+            with col2:
+                granularity = st.selectbox(
+                    "Group by",
+                    ["Year", "Quarter", "Month"],
+                    help="Choose time period granularity",
+                )
+
+            # Group books by selected time period
+            period_counts = {}
+            for _book, date in dated_books:
+                if granularity == "Year":
+                    period_key = date.strftime("%Y")
+                elif granularity == "Quarter":
+                    quarter = (date.month - 1) // 3 + 1
+                    period_key = f"{date.year} Q{quarter}"
+                else:  # Month
+                    period_key = date.strftime("%Y-%m")
+
+                period_counts[period_key] = period_counts.get(period_key, 0) + 1
+
+            # Create histogram
+            import pandas as pd
+
+            if period_counts:
+                df = pd.DataFrame(
+                    list(period_counts.items()), columns=["Period", "Books Read"]
+                )
+                df = df.sort_values("Period")
+
+                with col1:
+                    st.bar_chart(df.set_index("Period"), height=300)
+
+                # Show summary stats
+                st.markdown(
+                    f"**Total periods with reading activity:** {len(period_counts)} | "
+                    f"**Average per period:** {sum(period_counts.values()) / len(period_counts):.1f} books"
+                )
+
+            # Detailed timeline table
+            st.subheader("Chronological List")
             timeline_data = []
             for book, date in dated_books:
                 timeline_data.append(

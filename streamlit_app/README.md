@@ -7,7 +7,10 @@ This is a development/preview tool for visualizing book reading notes extracted 
 - **Overview Dashboard**: Total books, authors, sections, and items
 - **Filtering**: Filter by author and search across all content
 - **Book Browser**: Expandable view of each book with all sections
-- **Reading Timeline**: Chronological view of when books were read
+- **Reading Timeline**:
+  - Histogram showing reading activity over time
+  - Selectable granularity: Year, Quarter, or Month
+  - Chronological list of all books with dates
 - **Statistics**: Visualizations of books per author and common sections
 
 ## Installation
