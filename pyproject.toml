@@ -13,6 +13,10 @@ test = [
 dev = [
     "ruff>=0.1.0",
 ]
+streamlit = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+]
 
 [project.scripts]
 extract = "extract.cli:main"

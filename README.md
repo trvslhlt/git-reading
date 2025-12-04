@@ -49,9 +49,30 @@ uv run extract-readings
 - `--git-dir`: Git repository directory for date tracking (default: auto-detect from notes-dir)
 - `--output`: Output JSON file path (default: `book_index.json`)
 
+### Visualization
+
+For a visual interface to explore your indexed books, use the Streamlit app:
+
+```bash
+# Install Streamlit dependencies (one-time setup)
+make streamlit-install
+
+# Launch the visualization app
+make run-streamlit
+```
+
+This opens an interactive dashboard at `http://localhost:8501` with:
+- Overview metrics (total books, authors, sections)
+- Filter by author and search functionality
+- Expandable book details with all sections
+- Reading timeline
+- Statistics and visualizations
+
+See [streamlit_app/README.md](streamlit_app/README.md) for more details.
+
 ### Markdown File Format
 
-The tool expects markdown files named in the format `lastname_firstname.md`. Each file can contain multiple books:
+The tool expects markdown files named in the format `lastname__firstname.md` (double underscore). Each file can contain multiple books:
 
 ```markdown
 # Book Title
@@ -125,6 +146,8 @@ The project includes a Makefile for common development tasks:
 # Run commands with current source code (no install needed - best for development)
 make run                                   # Show available run commands
 make run-extract ARGS="--notes-dir /path/to/notes --output index.json"
+make run-validate ARGS="--notes-dir /path/to/notes"
+make run-streamlit                         # Launch visualization app
 make run-query ARGS="query arguments"      # When query is implemented
 make run-transform ARGS="transform args"   # When transform is implemented
 
@@ -160,8 +183,10 @@ git-reading/
 │   ├── extract/            # Extract data from markdown files
 │   │   ├── __init__.py
 │   │   └── main.py         # Main extraction logic (entry point)
-│   ├── normalize_source/   # Normalize source data
-│   │   └── __init__.py
+│   ├── normalize_source/   # Normalize and validate source data
+│   │   ├── __init__.py
+│   │   ├── cli.py          # CLI for validation
+│   │   └── rules/          # Validation rules
 │   ├── enrich/             # Enrich data with additional info
 │   │   └── __init__.py
 │   ├── transform/          # Transform data formats
@@ -170,6 +195,9 @@ git-reading/
 │   │   └── __init__.py
 │   └── query/              # Query indexed data
 │       └── __init__.py
+├── streamlit_app/          # Visualization app (separate from core code)
+│   ├── app.py              # Streamlit dashboard
+│   └── README.md           # Streamlit app docs
 ├── tests/
 │   └── test_integration.py # Integration tests
 ├── Makefile                 # Development task automation

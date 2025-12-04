@@ -155,3 +155,8 @@ Thumbs.db
 # Temporary files
 .tmp/
 .temp/
+
+# Streamlit user cache/credentials (but keep streamlit_app/.streamlit/config.toml)
+/.streamlit/
+**/.streamlit/secrets.toml
+**/.streamlit/credentials.toml
