@@ -4,23 +4,8 @@ import difflib
 import re
 from pathlib import Path
 
+from ..constants import CANONICAL_SECTIONS
 from ..models import Issue, IssueSeverity
-
-# Canonical section names from extract/main.py
-CANONICAL_SECTIONS: set[str] = {
-    "terms",
-    "notes",
-    "excerpts",
-    "threads",
-    "ideas",
-    "representations",
-    "images",
-    "same time",
-    "thread",
-    "note",
-    "excerpt",
-    "themes",
-}
 
 
 class SectionNameValidator:

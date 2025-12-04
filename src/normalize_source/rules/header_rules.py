@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+from ..constants import CANONICAL_SECTIONS
 from ..models import Issue, IssueSeverity
 
 
@@ -24,6 +25,22 @@ class HeaderValidator:
         issues = []
 
         for line_num, line in enumerate(lines, start=1):
+            # Check for level 1 headers (book titles) that are canonical section names
+            if line.startswith("# ") and not line.startswith("## "):
+                title = line[2:].strip().lower()
+                if title in CANONICAL_SECTIONS:
+                    issues.append(
+                        Issue(
+                            file_path=file_path,
+                            line_number=line_num,
+                            severity=IssueSeverity.ERROR,
+                            rule_id=f"{self.RULE_PREFIX}_003",
+                            message=f"Book title '{line[2:].strip()}' is a canonical section name and should not be used as a book title",
+                            context=line.strip(),
+                            suggestion=None,
+                        )
+                    )
+
             # Check for headers deeper than level 2
             if line.startswith("###"):
                 issues.append(
