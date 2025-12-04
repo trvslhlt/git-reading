@@ -72,6 +72,9 @@ class ValidationReporter:
         Returns:
             JSON string representation of results
         """
+        # Filter out files with no issues
+        results_with_issues = [r for r in results if not r.is_clean]
+
         data = {
             "files": [
                 {
@@ -88,7 +91,7 @@ class ValidationReporter:
                         for i in r.issues
                     ],
                 }
-                for r in results
+                for r in results_with_issues
             ]
         }
 

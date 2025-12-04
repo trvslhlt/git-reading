@@ -43,8 +43,9 @@ class CitationValidator:
                 section_items = []
                 continue
 
-            # Check list items
-            if line.strip().startswith("- "):
+            # Check list items (only top-level items, not nested)
+            stripped = line.strip()
+            if stripped.startswith("- ") and not line.startswith("    "):
                 section_items.append((line_num, line))
 
                 # Check for malformed citations
@@ -88,6 +89,7 @@ class CitationValidator:
         issues = []
 
         # Flag missing citations when the previous line had a citation
+        # but allow if no subsequent notes have citations
         for i, (line_num, line) in enumerate(items):
             has_citation = bool(self.CITATION_PATTERN.search(line))
 
@@ -97,17 +99,27 @@ class CitationValidator:
                 prev_has_citation = bool(self.CITATION_PATTERN.search(prev_line))
 
                 if prev_has_citation:
-                    issues.append(
-                        Issue(
-                            file_path=file_path,
-                            line_number=line_num,
-                            severity=IssueSeverity.WARNING,
-                            rule_id=f"{self.RULE_PREFIX}_002",
-                            message=f"Missing page citation after item with citation in section '{section_name}'",
-                            context=line.strip(),
-                            suggestion=None,
-                        )
+                    # Check if any subsequent items have citations
+                    subsequent_items = items[i:]
+                    any_subsequent_citations = any(
+                        bool(self.CITATION_PATTERN.search(item_line))
+                        for _, item_line in subsequent_items
                     )
+
+                    # Only flag if there are more citations later
+                    # (indicates we're in the middle of cited content)
+                    if any_subsequent_citations:
+                        issues.append(
+                            Issue(
+                                file_path=file_path,
+                                line_number=line_num,
+                                severity=IssueSeverity.WARNING,
+                                rule_id=f"{self.RULE_PREFIX}_002",
+                                message=f"Missing page citation after item with citation in section '{section_name}'",
+                                context=line.strip(),
+                                suggestion=None,
+                            )
+                        )
 
         return issues
 

@@ -44,14 +44,15 @@ class ListItemValidator:
                 )
 
             # Check for improper indentation of list items
-            if re.match(r"^\s{3,}-\s", line):
+            # Allow 4-space indentation for nested content, but flag other amounts
+            if re.match(r"^( {1,3}| {5,})-\s", line):
                 issues.append(
                     Issue(
                         file_path=file_path,
                         line_number=line_num,
                         severity=IssueSeverity.WARNING,
                         rule_id=f"{self.RULE_PREFIX}_002",
-                        message="Unexpected indentation for list item",
+                        message="Unexpected indentation for list item (use 0 spaces for top-level, 4 spaces for nested)",
                         context=line.strip(),
                         suggestion=line.lstrip().strip(),
                     )

@@ -162,10 +162,17 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
         elif current_book and current_section:
             stripped = line.strip()
             if stripped:
-                # Handle list items (- item) or plain lines
-                if stripped.startswith("- "):
+                # Check if this is indented content (should be grouped with parent)
+                if line.startswith("    ") and current_section_items:
+                    # This is an indented line (nested content)
+                    # Append to the last item with a newline to preserve structure
+                    current_section_items[-1] += "\n" + stripped
+                # Handle top-level list items
+                elif stripped.startswith("- "):
+                    # This is a top-level list item
                     current_section_items.append(stripped[2:])
                 else:
+                    # Non-list content
                     current_section_items.append(stripped)
 
     # Don't forget the last book/section
