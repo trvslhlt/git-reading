@@ -85,7 +85,7 @@ def test_basic_indexing_same_directory(temp_git_repo):
     repo_path = temp_git_repo
 
     # Create a markdown file with book notes
-    notes_file = repo_path / "author_john.md"
+    notes_file = repo_path / "author__john.md"
     notes_file.write_text("""# The Great Book
 
 ## Notes
@@ -114,7 +114,7 @@ def test_basic_indexing_same_directory(temp_git_repo):
     assert book["title"] == "The Great Book"
     assert book["author"] == "John Author"
     assert book["date_read"] == "2024-03-15"
-    assert book["source_file"] == "author_john.md"
+    assert book["source_file"] == "author__john.md"
     assert "notes" in book["sections"]
     assert book["sections"]["notes"] == ["First note", "Second note"]
     assert book["sections"]["excerpts"] == ["Great quote here"]
@@ -127,7 +127,7 @@ def test_indexing_separate_directories(temp_git_repo):
     notes_dir.mkdir()
 
     # Create a markdown file in the subdirectory
-    notes_file = notes_dir / "smith_jane.md"
+    notes_file = notes_dir / "smith__jane.md"
     notes_file.write_text("""# Book One
 
 ## Threads
@@ -249,7 +249,7 @@ def test_multiple_authors(temp_git_repo):
     repo_path = temp_git_repo
 
     # Create files for different authors
-    file1 = repo_path / "barth_john.md"
+    file1 = repo_path / "barth__john.md"
     file1.write_text("""# Lost in the Funhouse
 
 ## Excerpts
@@ -257,7 +257,7 @@ def test_multiple_authors(temp_git_repo):
 """)
     git_commit_file(repo_path, file1, "2024-04-01")
 
-    file2 = repo_path / "pynchon_thomas.md"
+    file2 = repo_path / "pynchon__thomas.md"
     file2.write_text("""# Gravity's Rainbow
 
 ## Notes

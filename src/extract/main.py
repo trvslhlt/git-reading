@@ -64,16 +64,28 @@ def find_git_root(start_path: Path) -> Path | None:
 def author_from_filename(filename: str) -> str:
     """
     Convert filename to author name.
-    e.g., 'barth_john.md' -> 'John Barth'
+    e.g., 'le_guin__ursula_k.md' -> 'Ursula K. Le Guin'
+    e.g., 'barth__john.md' -> 'John Barth'
+
+    Format: last_name__first_name.md (double underscore separator)
+    Single underscores within names become spaces.
     """
     stem = Path(filename).stem  # Remove .md
+
+    # Split on double underscore to separate last name from first name
+    if "__" in stem:
+        parts = stem.split("__")
+        if len(parts) == 2:
+            last_name, first_name = parts
+            # Replace single underscores with spaces and capitalize each word
+            last_parts = [p.capitalize() for p in last_name.split("_")]
+            first_parts = [p.capitalize() for p in first_name.split("_")]
+            # Return as "First Last"
+            return " ".join(first_parts + last_parts)
+
+    # Fallback: treat single underscores as word separators
     parts = stem.split("_")
-    if len(parts) >= 2:
-        # Assume format: lastname_firstname.md
-        # Capitalize each part and reverse order
-        return " ".join(part.capitalize() for part in reversed(parts))
-    else:
-        return stem.capitalize()
+    return " ".join(part.capitalize() for part in parts)
 
 
 def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
