@@ -19,7 +19,7 @@ CANONICAL_SECTIONS: set[str] = {
     "thread",
     "note",
     "excerpt",
-    "term",
+    "themes",
 }
 
 

@@ -31,7 +31,6 @@ class ValidationReporter:
 
         for result in results:
             if result.is_clean:
-                print(f"✓ {result.file_path.name} - No issues")
                 continue
 
             print(f"\n{result.file_path.name}:")

@@ -13,8 +13,10 @@ class CitationValidator:
     CITATION_PATTERN = re.compile(r"\(p\.\s+(\d+)\)")
     MALFORMED_PATTERNS = [
         (re.compile(r"\(p\.(\d+)\)"), "Missing space after 'p.'"),
+        (re.compile(r"\(p\s(\d+\))"), "Missing period after 'p'"),
         (re.compile(r"\(pg\.\s*\d+\)"), "Use 'p.' instead of 'pg.'"),
         (re.compile(r"\(page\s+\d+\)"), "Use 'p.' instead of 'page'"),
+        (re.compile(r"\(p\,\s*\d+\)"), "Use 'p.' instead of 'p,'"),
     ]
 
     def validate(self, lines: list[str], file_path: Path) -> list[Issue]:

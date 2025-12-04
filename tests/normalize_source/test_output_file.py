@@ -58,6 +58,6 @@ def test_console_output_to_file(tmp_path):
     # Verify output file was created
     assert output_file.exists()
 
-    # Verify it contains expected content
+    # Verify it contains expected content (summary line)
     content = output_file.read_text()
-    assert "test.md" in content or "No issues" in content
+    assert "Total:" in content
