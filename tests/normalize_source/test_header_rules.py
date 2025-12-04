@@ -1,7 +1,8 @@
 """Tests for header validation rules."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from normalize_source.models import IssueSeverity
 from normalize_source.rules.header_rules import HeaderValidator

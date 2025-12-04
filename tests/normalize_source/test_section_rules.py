@@ -1,7 +1,8 @@
 """Tests for section name validation rules."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from normalize_source.models import IssueSeverity
 from normalize_source.rules.section_rules import SectionNameValidator

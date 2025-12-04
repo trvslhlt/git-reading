@@ -11,8 +11,8 @@ help:
 	@echo ""
 	@echo "Run commands (use current source code, no install needed):"
 	@echo "  make run              - Show available run commands"
-	@echo "  make run-extract      - Run extract-readings command"
-	@echo "  make run-validate     - Run validation on markdown files"
+	@echo "  make run-extract      - Extract and index reading notes"
+	@echo "  make run-validate     - Validate markdown files"
 	@echo "  make run-learn-patterns - Learn patterns from markdown corpus"
 	@echo "  make run-query        - Run query command (when implemented)"
 	@echo "  make run-transform    - Run transform command (when implemented)"
@@ -58,7 +58,7 @@ clean:
 
 # Extract command - index reading notes
 run-extract:
-	PYTHONPATH=src uv run extract-readings $(ARGS)
+	PYTHONPATH=src uv run extract readings $(ARGS)
 
 # Validate command - validate markdown files
 run-validate:
@@ -82,7 +82,7 @@ run-transform:
 run:
 	@echo "Available run commands:"
 	@echo ""
-	@echo "  make run-extract ARGS='...'         - Run extract-readings command"
+	@echo "  make run-extract ARGS='...'         - Extract and index reading notes"
 	@echo "  make run-validate ARGS='...'        - Validate markdown files"
 	@echo "  make run-learn-patterns ARGS='...'  - Learn patterns from corpus"
 	@echo "  make run-query ARGS='...'           - Run query command (not yet implemented)"

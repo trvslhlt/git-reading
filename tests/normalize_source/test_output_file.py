@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from normalize_source.main import cmd_validate
+from normalize_source.cli import cmd_validate
 
 
 class Args:

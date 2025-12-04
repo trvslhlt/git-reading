@@ -57,9 +57,7 @@ class ValidationReporter:
 
         # Summary
         print("\n" + "=" * 60)
-        print(
-            f"Total: {total_errors} errors, {total_warnings} warnings, {total_info} info"
-        )
+        print(f"Total: {total_errors} errors, {total_warnings} warnings, {total_info} info")
 
         if total_errors > 0:
             return 1  # Exit code for errors

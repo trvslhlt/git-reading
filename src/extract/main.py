@@ -1,15 +1,10 @@
-#!/usr/bin/env python3
 """
 Index reading notes into a queryable JSON structure.
 
 Scans markdown files, parses book titles and sections, and uses git history
 to determine when each book was read (based on when the title was added).
-
-Usage:
-    python index_readings.py [--notes-dir PATH] [--git-dir PATH] [--output PATH]
 """
 
-import argparse
 import json
 import re
 import subprocess
@@ -230,44 +225,3 @@ def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None)
 
     output_path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nWrote index with {len(all_books)} books to {output_path}")
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Index reading notes into a queryable JSON structure."
-    )
-    parser.add_argument(
-        "--notes-dir",
-        type=Path,
-        default=Path("."),
-        help="Directory containing markdown notes (default: current directory)",
-    )
-    parser.add_argument(
-        "--git-dir",
-        type=Path,
-        default=None,
-        help="Git repository directory (default: auto-detect from notes-dir)",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("book_index.json"),
-        help="Output JSON file path (default: book_index.json)",
-    )
-
-    args = parser.parse_args()
-
-    if not args.notes_dir.is_dir():
-        print(f"Error: {args.notes_dir} is not a directory")
-        return 1
-
-    if args.git_dir and not args.git_dir.is_dir():
-        print(f"Error: {args.git_dir} is not a directory")
-        return 1
-
-    index_notes(args.notes_dir, args.output, args.git_dir)
-    return 0
-
-
-if __name__ == "__main__":
-    exit(main())

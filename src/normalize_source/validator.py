@@ -12,9 +12,7 @@ from .rules.section_rules import SectionNameValidator
 class MarkdownValidator:
     """Main validator orchestrating all validation rules."""
 
-    def __init__(
-        self, use_patterns: bool = False, pattern_store_path: Path | None = None
-    ):
+    def __init__(self, use_patterns: bool = False, pattern_store_path: Path | None = None):
         """Initialize the validator.
 
         Args:

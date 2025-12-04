@@ -37,9 +37,7 @@ class CitationValidator:
                 # Analyze previous section
                 if current_section:
                     issues.extend(
-                        self._check_section_consistency(
-                            section_items, file_path, current_section
-                        )
+                        self._check_section_consistency(section_items, file_path, current_section)
                     )
                 current_section = line.strip()
                 section_items = []
@@ -88,9 +86,7 @@ class CitationValidator:
             List of validation issues found
         """
         issues = []
-        has_citations = [
-            bool(self.CITATION_PATTERN.search(line)) for _, line in items
-        ]
+        has_citations = [bool(self.CITATION_PATTERN.search(line)) for _, line in items]
 
         # If most items have citations, flag those without
         if len(has_citations) > 0 and sum(has_citations) > len(has_citations) / 2:
