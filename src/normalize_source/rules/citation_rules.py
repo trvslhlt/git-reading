@@ -86,19 +86,24 @@ class CitationValidator:
             List of validation issues found
         """
         issues = []
-        has_citations = [bool(self.CITATION_PATTERN.search(line)) for _, line in items]
 
-        # If most items have citations, flag those without
-        if len(has_citations) > 0 and sum(has_citations) > len(has_citations) / 2:
-            for (line_num, line), has_citation in zip(items, has_citations, strict=True):
-                if not has_citation:
+        # Flag missing citations when the previous line had a citation
+        for i, (line_num, line) in enumerate(items):
+            has_citation = bool(self.CITATION_PATTERN.search(line))
+
+            if not has_citation and i > 0:
+                # Check if previous line had a citation
+                _, prev_line = items[i - 1]
+                prev_has_citation = bool(self.CITATION_PATTERN.search(prev_line))
+
+                if prev_has_citation:
                     issues.append(
                         Issue(
                             file_path=file_path,
                             line_number=line_num,
                             severity=IssueSeverity.WARNING,
                             rule_id=f"{self.RULE_PREFIX}_002",
-                            message=f"Missing page citation in section '{section_name}' where most items have citations",
+                            message=f"Missing page citation after item with citation in section '{section_name}'",
                             context=line.strip(),
                             suggestion=None,
                         )
