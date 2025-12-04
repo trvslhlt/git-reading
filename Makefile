@@ -59,7 +59,7 @@ run-extract:
 
 # Validate command - validate markdown files
 run-validate:
-	PYTHONPATH=src uv run python -m normalize_source.main validate $(ARGS)
+	PYTHONPATH=src uv run normalize validate $(ARGS)
 
 # Learn patterns command - learn patterns from corpus
 run-learn-patterns:

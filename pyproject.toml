@@ -16,6 +16,7 @@ dev = [
 
 [project.scripts]
 extract-readings = "extract.main:main"
+normalize = "normalize_source.main:main"
 
 [build-system]
 requires = ["hatchling"]
