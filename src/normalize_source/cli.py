@@ -6,6 +6,7 @@ import io
 import sys
 from pathlib import Path
 
+from .interactive_fixer import InteractiveFixer
 from .patterns.learner import PatternLearner
 from .reporters import ValidationReporter
 from .validator import MarkdownValidator
@@ -101,6 +102,40 @@ def cmd_learn(args):
     return 0
 
 
+def cmd_fix(args):
+    """Interactively apply fixes from validation results.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, non-zero for errors)
+    """
+    validation_json = Path(args.validation)
+    notes_dir = Path(args.notes_dir)
+
+    if not validation_json.exists():
+        print(f"Error: Validation JSON file '{validation_json}' does not exist")
+        return 1
+
+    if not notes_dir.exists():
+        print(f"Error: Notes directory '{notes_dir}' does not exist")
+        return 1
+
+    try:
+        fixer = InteractiveFixer(validation_json, notes_dir=notes_dir)
+        stats = fixer.run(auto_yes=args.yes)
+
+        # Return non-zero if any fixes failed
+        if stats["failed"] > 0:
+            return 1
+
+        return 0
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+
 def main():
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(description="Validate markdown reading notes")
@@ -152,6 +187,30 @@ def main():
         help="Output path for learned patterns",
     )
     learn_parser.set_defaults(func=cmd_learn)
+
+    # Fix command
+    fix_parser = subparsers.add_parser(
+        "fix", help="Interactively apply fixes from validation results"
+    )
+    fix_parser.add_argument(
+        "--validation",
+        type=str,
+        required=True,
+        help="Path to validation JSON file",
+    )
+    fix_parser.add_argument(
+        "--notes-dir",
+        type=str,
+        default=".",
+        help="Directory containing markdown notes (default: current directory)",
+    )
+    fix_parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Automatically apply all fixes without prompting",
+    )
+    fix_parser.set_defaults(func=cmd_fix)
 
     args = parser.parse_args()
     return args.func(args)

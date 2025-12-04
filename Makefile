@@ -1,4 +1,4 @@
-.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns dev-install
+.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix dev-install
 
 help:
 	@echo "Available commands:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make run              - Show available run commands"
 	@echo "  make run-extract      - Extract and index reading notes"
 	@echo "  make run-validate     - Validate markdown files"
+	@echo "  make run-fix          - Interactively apply fixes from validation JSON"
 	@echo "  make run-learn-patterns - Learn patterns from markdown corpus"
 	@echo "  make run-query        - Run query command (when implemented)"
 	@echo "  make run-transform    - Run transform command (when implemented)"
@@ -22,6 +23,8 @@ help:
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
 	@echo "  make run-validate ARGS='--format json --output validation.json'"
+	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes'"
+	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes -y'  # Auto-apply all fixes"
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
@@ -64,6 +67,10 @@ run-extract:
 run-validate:
 	PYTHONPATH=src uv run normalize validate $(ARGS)
 
+# Fix command - interactively apply fixes from validation JSON
+run-fix:
+	PYTHONPATH=src uv run normalize fix $(ARGS)
+
 # Learn patterns command - learn patterns from corpus
 run-learn-patterns:
 	PYTHONPATH=src uv run python -m normalize_source.main learn $(ARGS)
@@ -84,6 +91,7 @@ run:
 	@echo ""
 	@echo "  make run-extract ARGS='...'         - Extract and index reading notes"
 	@echo "  make run-validate ARGS='...'        - Validate markdown files"
+	@echo "  make run-fix ARGS='...'             - Interactively apply fixes from validation JSON"
 	@echo "  make run-learn-patterns ARGS='...'  - Learn patterns from corpus"
 	@echo "  make run-query ARGS='...'           - Run query command (not yet implemented)"
 	@echo "  make run-transform ARGS='...'       - Run transform command (not yet implemented)"
@@ -93,6 +101,8 @@ run:
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
 	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
 	@echo "  make run-validate ARGS='--format json --output validation.json'"
+	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes'"
+	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes -y'  # Auto-apply all fixes"
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-extract ARGS='--help'"
