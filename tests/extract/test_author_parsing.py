@@ -25,10 +25,7 @@ def test_double_underscore_multipart_first_name():
 
 def test_double_underscore_both_multipart():
     """Test parsing with multi-part first and last names."""
-    assert (
-        author_from_filename("de_la_cruz__maria_isabel.md")
-        == "Maria Isabel De La Cruz"
-    )
+    assert author_from_filename("de_la_cruz__maria_isabel.md") == "Maria Isabel De La Cruz"
 
 
 def test_fallback_single_underscore():

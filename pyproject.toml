@@ -18,10 +18,16 @@ streamlit = [
     "pandas>=2.0.0",
     "watchdog>=6.0.0",
 ]
+search = [
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.4",
+    "numpy>=1.24.0",
+]
 
 [project.scripts]
 extract = "extract.cli:main"
 normalize = "normalize_source.cli:main"
+search = "query.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -64,7 +70,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["extract", "enrich", "load", "normalize_source", "query", "transform"]
+known-first-party = ["extract", "enrich", "load", "normalize_source", "query", "transform", "search"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B", "F401", "F811"]

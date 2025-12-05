@@ -50,9 +50,7 @@ class MarkdownFixer:
 
         # Verify the line matches the context (safety check)
         if original_line.strip() != issue.context.strip():
-            print(
-                f"Warning: Line {line_number} in {file_path} doesn't match expected context"
-            )
+            print(f"Warning: Line {line_number} in {file_path} doesn't match expected context")
             print(f"  Expected: {issue.context}")
             print(f"  Found: {original_line}")
             return False
