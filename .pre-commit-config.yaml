@@ -1,0 +1,46 @@
+# Pre-commit hooks for git-reading
+# Install with: uv pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.5
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+        name: Format with Ruff
+      # Run the linter
+      - id: ruff
+        name: Lint with Ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Prevent committing large files
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      # Check for files that would conflict in case-insensitive filesystems
+      - id: check-case-conflict
+      # Check for merge conflicts
+      - id: check-merge-conflict
+      # Check YAML files are valid
+      - id: check-yaml
+      # Check TOML files are valid
+      - id: check-toml
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: local
+    hooks:
+      # Run tests before commit (optional - can be slow)
+      # Uncomment if you want tests to run on every commit
+      # - id: pytest
+      #   name: Run pytest
+      #   entry: uv run pytest
+      #   language: system
+      #   pass_filenames: false
+      #   always_run: true

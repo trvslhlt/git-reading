@@ -65,7 +65,12 @@ class InteractiveFixer:
         print(f"\nFound {len(self.issues_with_suggestions)} fixable issues.\n")
 
         fixer = MarkdownFixer(dry_run=False)
-        stats = {"total": len(self.issues_with_suggestions), "applied": 0, "skipped": 0, "failed": 0}
+        stats = {
+            "total": len(self.issues_with_suggestions),
+            "applied": 0,
+            "skipped": 0,
+            "failed": 0,
+        }
 
         for i, issue in enumerate(self.issues_with_suggestions, 1):
             print(f"[{i}/{stats['total']}] {issue.file_path}:{issue.line_number}")
@@ -77,9 +82,7 @@ class InteractiveFixer:
             if auto_yes:
                 choice = "y"
             else:
-                choice = (
-                    input("\nApply this fix? [y/n/q (quit)] ").strip().lower()
-                )
+                choice = input("\nApply this fix? [y/n/q (quit)] ").strip().lower()
 
             if choice == "q":
                 print("\nQuitting...")
