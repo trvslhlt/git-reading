@@ -146,7 +146,7 @@ make run-search-build
 
 ### Documentation Updates
 
-3. **[SEMANTIC_SEARCH.md](../SEMANTIC_SEARCH.md)**
+3. **[SEMANTIC_SEARCH.md](SEMANTIC_SEARCH.md)**
    - Added pre-filtering section
    - Updated performance numbers
    - Added technical details

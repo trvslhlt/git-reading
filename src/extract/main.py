@@ -61,14 +61,17 @@ def find_git_root(start_path: Path) -> Path | None:
     return None
 
 
-def author_from_filename(filename: str) -> str:
+def author_from_filename(filename: str) -> tuple[str, str]:
     """
-    Convert filename to author name.
-    e.g., 'le_guin__ursula_k.md' -> 'Ursula K. Le Guin'
-    e.g., 'barth__john.md' -> 'John Barth'
+    Convert filename to author first and last names.
+    e.g., 'le_guin__ursula_k.md' -> ('Ursula K', 'Le Guin')
+    e.g., 'barth__john.md' -> ('John', 'Barth')
 
     Format: last_name__first_name.md (double underscore separator)
     Single underscores within names become spaces.
+
+    Returns:
+        tuple[str, str]: (first_name, last_name)
     """
     stem = Path(filename).stem  # Remove .md
 
@@ -80,12 +83,13 @@ def author_from_filename(filename: str) -> str:
             # Replace single underscores with spaces and capitalize each word
             last_parts = [p.capitalize() for p in last_name.split("_")]
             first_parts = [p.capitalize() for p in first_name.split("_")]
-            # Return as "First Last"
-            return " ".join(first_parts + last_parts)
+            # Return as tuple (first_name, last_name)
+            return (" ".join(first_parts), " ".join(last_parts))
 
-    # Fallback: treat single underscores as word separators
+    # Fallback: treat single underscores as word separators, assume all is last name
     parts = stem.split("_")
-    return " ".join(part.capitalize() for part in parts)
+    full_name = " ".join(part.capitalize() for part in parts)
+    return ("", full_name)
 
 
 def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
@@ -96,7 +100,7 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
     content = filepath.read_text(encoding="utf-8")
     lines = content.split("\n")
 
-    author = author_from_filename(filepath.name)
+    author_first_name, author_last_name = author_from_filename(filepath.name)
     books = []
     current_book = None
     current_section = None
@@ -158,7 +162,8 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
 
             current_book = {
                 "title": title,
-                "author": author,
+                "author_first_name": author_first_name,
+                "author_last_name": author_last_name,
                 "date_read": date_read,
                 "source_file": filepath.name,
                 "sections": {},

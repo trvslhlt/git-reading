@@ -108,7 +108,21 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     for i, chunk in enumerate(chunks):
         # Extract data from chunk
         title = chunk.get("title", "Unknown")
-        author = chunk.get("author", "Unknown")
+
+        # Extract author name parts
+        author_first_name = chunk.get("author_first_name", "")
+        author_last_name = chunk.get("author_last_name", "")
+
+        # Generate full name for compatibility
+        if author_first_name and author_last_name:
+            author = f"{author_first_name} {author_last_name}"
+        elif author_last_name:
+            author = author_last_name
+        elif author_first_name:
+            author = author_first_name
+        else:
+            author = "Unknown"
+
         section = chunk.get("section", "")
         excerpt = chunk.get("excerpt", "")
 
@@ -121,11 +135,13 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
             try:
                 cursor.execute(
                     """
-                    INSERT INTO authors (id, name)
-                    VALUES (?, ?)
-                    ON CONFLICT(name) DO UPDATE SET name=name
+                    INSERT INTO authors (id, first_name, last_name, name)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET
+                        first_name=excluded.first_name,
+                        last_name=excluded.last_name
                 """,
-                    (author_id, author),
+                    (author_id, author_first_name, author_last_name, author),
                 )
                 authors_seen[author] = author_id
             except sqlite3.IntegrityError:

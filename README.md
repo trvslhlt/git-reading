@@ -78,6 +78,8 @@ Semantic search features:
 
 The search index is built from your JSON index and stored in `.tmp/vector_store/`.
 
+For more details on semantic search architecture and features, see [docs/SEMANTIC_SEARCH.md](docs/SEMANTIC_SEARCH.md).
+
 ### Visualization
 
 For a visual interface to explore your indexed books, use the Streamlit app:

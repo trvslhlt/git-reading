@@ -45,7 +45,8 @@ def build_search_index(
     print("Extracting text chunks...")
     for book in books:
         title = book.get("title", "Unknown")
-        author = book.get("author", "Unknown")
+        author_first_name = book.get("author_first_name", "")
+        author_last_name = book.get("author_last_name", "")
         date_read = book.get("date_read")
         source_file = book.get("source_file", "")
         sections = book.get("sections", {})
@@ -63,7 +64,8 @@ def build_search_index(
                 chunk = TextChunk(
                     text=item,
                     book_title=title,
-                    author=author,
+                    author_first_name=author_first_name,
+                    author_last_name=author_last_name,
                     section=section_name,
                     source_file=source_file,
                     date_read=date_read,
