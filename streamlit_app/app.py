@@ -189,9 +189,7 @@ def main():
             import pandas as pd
 
             if period_counts:
-                df = pd.DataFrame(
-                    list(period_counts.items()), columns=["Period", "Books Read"]
-                )
+                df = pd.DataFrame(list(period_counts.items()), columns=["Period", "Books Read"])
                 df = df.sort_values("Period")
 
                 with col1:
