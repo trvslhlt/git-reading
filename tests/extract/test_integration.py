@@ -275,8 +275,5 @@ def test_multiple_authors(temp_git_repo):
     assert index["total_books"] == 2
 
     # Verify authors were parsed correctly from filenames
-    authors = {
-        f"{book['author_first_name']} {book['author_last_name']}"
-        for book in index["books"]
-    }
+    authors = {f"{book['author_first_name']} {book['author_last_name']}" for book in index["books"]}
     assert authors == {"John Barth", "Thomas Pynchon"}
