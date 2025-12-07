@@ -140,7 +140,9 @@ def main():
 
                         with col1:
                             st.markdown(f"### {i}. {result['book_title']}")
-                            st.markdown(f"**by {result['author']}** • Section: `{result['section']}`")
+                            st.markdown(
+                                f"**by {result['author']}** • Section: `{result['section']}`"
+                            )
 
                         with col2:
                             st.markdown(

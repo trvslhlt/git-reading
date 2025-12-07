@@ -143,18 +143,14 @@ class VectorStoreDB:
         # PRE-FILTERING: Search only filtered vectors if filters applied
         if filter_author or filter_section or filter_book:
             # Extract only the filtered embeddings
-            filtered_vectors = np.array(
-                [self.index.reconstruct(int(idx)) for idx in faiss_indices]
-            )
+            filtered_vectors = np.array([self.index.reconstruct(int(idx)) for idx in faiss_indices])
 
             # Create temporary index with just filtered vectors
             temp_index = faiss.IndexFlatL2(self.dimension)
             temp_index.add(filtered_vectors.astype(np.float32))
 
             # Search the filtered index
-            distances, temp_indices = temp_index.search(
-                query_norm, min(k, len(faiss_indices))
-            )
+            distances, temp_indices = temp_index.search(query_norm, min(k, len(faiss_indices)))
 
             # Map temporary indices back to original faiss indices
             original_faiss_indices = [faiss_indices[i] for i in temp_indices[0]]
@@ -305,9 +301,7 @@ class VectorStoreDB:
         cursor.execute("SELECT name FROM authors ORDER BY name")
         authors = [row[0] for row in cursor.fetchall()]
 
-        cursor.execute(
-            "SELECT DISTINCT section FROM chunks WHERE section != '' ORDER BY section"
-        )
+        cursor.execute("SELECT DISTINCT section FROM chunks WHERE section != '' ORDER BY section")
         sections = [row[0] for row in cursor.fetchall()]
 
         conn.close()

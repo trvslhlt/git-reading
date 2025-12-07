@@ -114,21 +114,13 @@ def create_database(db_path: str | Path) -> None:
 
     # Create indexes for common queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_book_id ON chunks(book_id)")
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chunks_faiss_index ON chunks(faiss_index)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id)"
-    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_faiss_index ON chunks(faiss_index)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id)")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id)"
     )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_book_genres_book_id ON book_genres(book_id)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_book_genres_genre_id ON book_genres(genre_id)"
-    )
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_genres_book_id ON book_genres(book_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_genres_genre_id ON book_genres(genre_id)")
 
     conn.commit()
     conn.close()

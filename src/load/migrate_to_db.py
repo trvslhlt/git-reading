@@ -43,9 +43,7 @@ def generate_author_id(name: str) -> str:
     return slug[:100]
 
 
-def migrate_from_json(
-    json_path: str | Path, db_path: str | Path, verbose: bool = True
-) -> None:
+def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
     """Migrate data from index.json to SQLite database.
 
     Args:
@@ -79,12 +77,14 @@ def migrate_from_json(
         for section_name, excerpts in sections_data.items():
             if isinstance(excerpts, list):
                 for excerpt in excerpts:
-                    chunks.append({
-                        "title": title,
-                        "author": author,
-                        "section": section_name,
-                        "excerpt": excerpt,
-                    })
+                    chunks.append(
+                        {
+                            "title": title,
+                            "author": author,
+                            "section": section_name,
+                            "excerpt": excerpt,
+                        }
+                    )
 
     if verbose:
         print(f"Extracted {len(chunks)} chunks from books")
@@ -209,7 +209,7 @@ def verify_migration(db_path: str | Path, json_path: str | Path) -> bool:
     json_chunk_count = 0
     for book in books:
         sections_data = book.get("sections", {})
-        for section_name, excerpts in sections_data.items():
+        for _, excerpts in sections_data.items():
             if isinstance(excerpts, list):
                 json_chunk_count += len(excerpts)
 
