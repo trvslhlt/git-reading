@@ -21,15 +21,25 @@ class TextChunk:
 
     text: str
     book_title: str
-    author: str
+    author_first_name: str
+    author_last_name: str
     section: str
     source_file: str
     date_read: str | None = None
     chunk_id: str | None = None
 
+    @property
+    def author(self) -> str:
+        """Get full author name for backward compatibility."""
+        if self.author_first_name and self.author_last_name:
+            return f"{self.author_first_name} {self.author_last_name}"
+        return self.author_last_name or self.author_first_name or "Unknown"
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        return asdict(self)
+        d = asdict(self)
+        d["author"] = self.author  # Add computed full name
+        return d
 
 
 class VectorStore:

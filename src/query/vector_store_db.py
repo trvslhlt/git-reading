@@ -24,12 +24,20 @@ class SearchResult:
     chunk_id: int
     excerpt: str
     book_title: str
-    author: str
+    author_first_name: str
+    author_last_name: str
     section: str
     similarity: float
     page_number: int | None = None
     book_id: str | None = None
     author_id: str | None = None
+
+    @property
+    def author(self) -> str:
+        """Get full author name for backward compatibility."""
+        if self.author_first_name and self.author_last_name:
+            return f"{self.author_first_name} {self.author_last_name}"
+        return self.author_last_name or self.author_first_name or "Unknown"
 
 
 class VectorStoreDB:
@@ -176,7 +184,7 @@ class VectorStoreDB:
             cursor.execute(
                 """
                 SELECT c.id, c.excerpt, c.section, c.page_number, c.book_id,
-                       b.title, a.id as author_id, a.name
+                       b.title, a.id as author_id, a.first_name, a.last_name
                 FROM chunks c
                 JOIN books b ON c.book_id = b.id
                 JOIN book_authors ba ON b.id = ba.book_id
@@ -197,7 +205,8 @@ class VectorStoreDB:
                         book_id=row[4],
                         book_title=row[5],
                         author_id=row[6],
-                        author=row[7],
+                        author_first_name=row[7],
+                        author_last_name=row[8],
                         similarity=float(similarity),
                     )
                 )

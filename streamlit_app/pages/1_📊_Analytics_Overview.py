@@ -8,6 +8,15 @@ import pandas as pd
 import streamlit as st
 
 
+def get_author_name(book: dict) -> str:
+    """Get full author name from book data."""
+    first_name = book.get("author_first_name", "")
+    last_name = book.get("author_last_name", "")
+    if first_name and last_name:
+        return f"{first_name} {last_name}"
+    return last_name or first_name or "Unknown"
+
+
 def load_index(index_path: Path) -> dict:
     """Load the book index JSON file."""
     if not index_path.exists():
@@ -43,7 +52,7 @@ def main():
         st.metric("Total Books", total_books)
 
     with col2:
-        authors = {book["author"] for book in books}
+        authors = {get_author_name(book) for book in books}
         st.metric("Authors", len(authors))
 
     with col3:
@@ -77,7 +86,7 @@ def main():
     # Apply filters
     filtered_books = books
     if selected_authors:
-        filtered_books = [b for b in filtered_books if b["author"] in selected_authors]
+        filtered_books = [b for b in filtered_books if get_author_name(b) in selected_authors]
 
     if search_query:
         query_lower = search_query.lower()
@@ -98,11 +107,11 @@ def main():
     st.header("Books")
 
     for book in filtered_books:
-        with st.expander(f"**{book['title']}** by {book['author']}"):
+        with st.expander(f"**{book['title']}** by {get_author_name(book)}"):
             col1, col2 = st.columns([2, 1])
 
             with col1:
-                st.markdown(f"**Author:** {book['author']}")
+                st.markdown(f"**Author:** {get_author_name(book)}")
                 if book.get("date_read"):
                     st.markdown(f"**Date Read:** {book['date_read']}")
                 st.markdown(f"**Source:** `{book.get('source_file', 'Unknown')}`")
@@ -189,7 +198,7 @@ def main():
                     {
                         "Date": date.strftime("%Y-%m-%d"),
                         "Book": book["title"],
-                        "Author": book["author"],
+                        "Author": get_author_name(book),
                     }
                 )
 
@@ -210,7 +219,7 @@ def main():
         st.subheader("Books per Author")
         author_counts = {}
         for book in books:
-            author = book["author"]
+            author = get_author_name(book)
             author_counts[author] = author_counts.get(author, 0) + 1
 
         st.bar_chart(author_counts)

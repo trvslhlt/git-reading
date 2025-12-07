@@ -112,7 +112,8 @@ def test_basic_indexing_same_directory(temp_git_repo):
 
     book = index["books"][0]
     assert book["title"] == "The Great Book"
-    assert book["author"] == "John Author"
+    assert book["author_first_name"] == "John"
+    assert book["author_last_name"] == "Author"
     assert book["date_read"] == "2024-03-15"
     assert book["source_file"] == "author__john.md"
     assert "notes" in book["sections"]
@@ -155,7 +156,8 @@ def test_indexing_separate_directories(temp_git_repo):
     # Books should be sorted by date
     assert index["books"][0]["title"] == "Book One"
     assert index["books"][0]["date_read"] == "2024-06-20"
-    assert index["books"][0]["author"] == "Jane Smith"
+    assert index["books"][0]["author_first_name"] == "Jane"
+    assert index["books"][0]["author_last_name"] == "Smith"
 
     assert index["books"][1]["title"] == "Book Two"
     assert index["books"][1]["date_read"] == "2024-06-20"
@@ -273,5 +275,8 @@ def test_multiple_authors(temp_git_repo):
     assert index["total_books"] == 2
 
     # Verify authors were parsed correctly from filenames
-    authors = {book["author"] for book in index["books"]}
+    authors = {
+        f"{book['author_first_name']} {book['author_last_name']}"
+        for book in index["books"]
+    }
     assert authors == {"John Barth", "Thomas Pynchon"}

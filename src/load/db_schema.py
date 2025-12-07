@@ -42,6 +42,8 @@ def create_database(db_path: str | Path) -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS authors (
             id TEXT PRIMARY KEY,
+            first_name TEXT NOT NULL DEFAULT '',
+            last_name TEXT NOT NULL DEFAULT '',
             name TEXT NOT NULL UNIQUE,
             birth_year INTEGER,
             death_year INTEGER,
@@ -121,6 +123,9 @@ def create_database(db_path: str | Path) -> None:
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_genres_book_id ON book_genres(book_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_genres_genre_id ON book_genres(genre_id)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_authors_name_parts ON authors(first_name, last_name)"
+    )
 
     conn.commit()
     conn.close()
