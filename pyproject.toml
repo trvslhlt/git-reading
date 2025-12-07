@@ -29,6 +29,7 @@ search = [
 extract = "extract.cli:main"
 normalize = "normalize_source.cli:main"
 search = "query.cli:main"
+load-db = "load.cli:main"
 
 [build-system]
 requires = ["hatchling"]

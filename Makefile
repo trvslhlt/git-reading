@@ -1,4 +1,4 @@
-.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix run-streamlit run-search-build run-search-query run-search-stats dev-install streamlit-install search-install
+.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix run-streamlit run-search-build run-search-query run-search-stats run-migrate dev-install streamlit-install search-install
 
 help:
 	@echo "Available commands:"
@@ -118,6 +118,10 @@ run-transform:
 # Streamlit visualization app
 run-streamlit:
 	uv run streamlit run streamlit_app/app.py
+
+# Migrate JSON index to SQLite database
+run-migrate:
+	PYTHONPATH=src uv run load-db migrate $(ARGS)
 
 # Show available run commands when 'make run' is called without a specific target
 run:
