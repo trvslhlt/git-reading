@@ -237,7 +237,7 @@ uv run pre-commit install
 3. **Update search method** (add filter parameter)
 4. **Update CLI** (`src/query/cli.py`)
 5. **Add tests** (`tests/`)
-6. **Update documentation** (README, SEMANTIC_SEARCH.md)
+6. **Update documentation** (README, docs/SEMANTIC_SEARCH.md)
 7. **Run checks** (`make format && make lint && make test`)
 8. **Commit and PR**
 
