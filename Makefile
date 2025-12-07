@@ -1,10 +1,11 @@
-.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix run-streamlit dev-install streamlit-install
+.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix run-streamlit run-search-build run-search-query run-search-stats dev-install streamlit-install search-install
 
 help:
 	@echo "Available commands:"
 	@echo "  make install          - Install the package"
 	@echo "  make dev-install      - Install dev dependencies"
 	@echo "  make streamlit-install - Install Streamlit dependencies"
+	@echo "  make search-install   - Install semantic search dependencies"
 	@echo "  make test             - Run tests"
 	@echo "  make lint             - Run linter"
 	@echo "  make format           - Format code"
@@ -17,6 +18,9 @@ help:
 	@echo "  make run-fix          - Interactively apply fixes from validation JSON"
 	@echo "  make run-learn-patterns - Learn patterns from markdown corpus"
 	@echo "  make run-streamlit    - Launch Streamlit visualization app"
+	@echo "  make run-search-build - Build semantic search index"
+	@echo "  make run-search-query - Query semantic search index"
+	@echo "  make run-search-stats - Show search index statistics"
 	@echo "  make run-query        - Run query command (when implemented)"
 	@echo "  make run-transform    - Run transform command (when implemented)"
 	@echo ""
@@ -30,6 +34,9 @@ help:
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-streamlit    # Launches visualization app at http://localhost:8501"
+	@echo "  make run-search-build # Build vector search index from .tmp/index.json"
+	@echo "  make run-search-query ARGS='\"meaning of life\"'  # Search for similar notes"
+	@echo "  make run-search-stats # Show search index statistics"
 	@echo "  make run-extract ARGS='--help'"
 
 install:
@@ -41,6 +48,9 @@ dev-install:
 
 streamlit-install:
 	uv pip install -e ".[streamlit]"
+
+search-install:
+	uv pip install -e ".[search]"
 
 test:
 	uv pip install .
@@ -86,6 +96,20 @@ run-query:
 	@echo "Query command not yet implemented"
 	@echo "When ready, will run: PYTHONPATH=src uv run query-readings $(ARGS)"
 
+# Search commands - semantic search functionality
+
+# Build vector search index
+run-search-build:
+	PYTHONPATH=src uv run search build $(ARGS)
+
+# Query vector search index
+run-search-query:
+	PYTHONPATH=src uv run search query $(ARGS)
+
+# Show vector store statistics
+run-search-stats:
+	PYTHONPATH=src uv run search stats $(ARGS)
+
 # Transform command (placeholder for future implementation)
 run-transform:
 	@echo "Transform command not yet implemented"
@@ -104,6 +128,9 @@ run:
 	@echo "  make run-fix ARGS='...'             - Interactively apply fixes from validation JSON"
 	@echo "  make run-learn-patterns ARGS='...'  - Learn patterns from corpus"
 	@echo "  make run-streamlit                  - Launch Streamlit visualization app"
+	@echo "  make run-search-build ARGS='...'    - Build semantic search index"
+	@echo "  make run-search-query ARGS='...'    - Query semantic search index"
+	@echo "  make run-search-stats ARGS='...'    - Show search index statistics"
 	@echo "  make run-query ARGS='...'           - Run query command (not yet implemented)"
 	@echo "  make run-transform ARGS='...'       - Run transform command (not yet implemented)"
 	@echo ""
@@ -117,6 +144,9 @@ run:
 	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
 	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
 	@echo "  make run-streamlit                  # Opens http://localhost:8501"
+	@echo "  make run-search-build               # Build index from .tmp/index.json"
+	@echo "  make run-search-query ARGS='\"your query\"'  # Search for similar content"
+	@echo "  make run-search-stats               # View index statistics"
 	@echo "  make run-extract ARGS='--help'"
 	@echo ""
 	@echo "Tip: These commands run your current source code without reinstalling."

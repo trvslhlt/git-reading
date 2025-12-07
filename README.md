@@ -20,7 +20,7 @@ The output is a queryable JSON index that preserves your reading timeline.
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install the tool
-uv sync
+make install
 ```
 
 ### Usage
@@ -28,19 +28,19 @@ uv sync
 Index your reading notes:
 
 ```bash
-uv run extract-readings --notes-dir /path/to/notes --output book_index.json
+make run-extract ARGS='--notes-dir /path/to/notes --output book_index.json'
 ```
 
 If your notes and git repository are in different locations:
 
 ```bash
-uv run extract-readings --notes-dir /path/to/notes --git-dir /path/to/repo --output book_index.json
+make run-extract ARGS='--notes-dir /path/to/notes --git-dir /path/to/repo --output book_index.json'
 ```
 
-If run from the notes directory:
+If run from the notes directory (using defaults):
 
 ```bash
-uv run extract-readings
+make run-extract
 ```
 
 #### Arguments
@@ -48,6 +48,35 @@ uv run extract-readings
 - `--notes-dir`: Directory containing markdown notes (default: current directory)
 - `--git-dir`: Git repository directory for date tracking (default: auto-detect from notes-dir)
 - `--output`: Output JSON file path (default: `book_index.json`)
+
+### Semantic Search
+
+Search through your reading notes using AI-powered semantic similarity:
+
+```bash
+# Install search dependencies (one-time setup)
+make search-install
+
+# Build the search index from your extracted JSON
+make run-search-build
+
+# Search for content by meaning, not just keywords
+make run-search-query ARGS='"meaning of life"'
+make run-search-query ARGS='"time and memory" -k 10'
+make run-search-query ARGS='"narrative structure" --author "John Barth"'
+
+# View index statistics
+make run-search-stats
+```
+
+Semantic search features:
+- **Finds related concepts**: Searches by meaning, not just exact keyword matches
+- **Fast**: Uses FAISS for efficient similarity search
+- **Flexible filtering**: Filter by author or section
+- **Local & private**: Runs entirely on your machine using sentence-transformers
+- **Customizable**: Adjust result count, filter by metadata, or use different embedding models
+
+The search index is built from your JSON index and stored in `.tmp/vector_store/`.
 
 ### Visualization
 
@@ -148,7 +177,8 @@ make run                                   # Show available run commands
 make run-extract ARGS="--notes-dir /path/to/notes --output index.json"
 make run-validate ARGS="--notes-dir /path/to/notes"
 make run-streamlit                         # Launch visualization app
-make run-query ARGS="query arguments"      # When query is implemented
+make run-search-build                      # Build semantic search index
+make run-search-query ARGS='"your query"'  # Query semantic search
 make run-transform ARGS="transform args"   # When transform is implemented
 
 # Install the package (needed after making changes to test installed version)
@@ -182,18 +212,23 @@ git-reading/
 ├── src/
 │   ├── extract/            # Extract data from markdown files
 │   │   ├── __init__.py
-│   │   └── main.py         # Main extraction logic (entry point)
+│   │   ├── cli.py          # CLI for extraction
+│   │   └── main.py         # Main extraction logic
 │   ├── normalize_source/   # Normalize and validate source data
 │   │   ├── __init__.py
 │   │   ├── cli.py          # CLI for validation
 │   │   └── rules/          # Validation rules
-│   ├── enrich/             # Enrich data with additional info
+│   ├── query/              # Semantic search and query indexed data
+│   │   ├── __init__.py
+│   │   ├── cli.py          # CLI for search commands
+│   │   ├── embeddings.py   # Embedding model wrapper
+│   │   ├── vector_store.py # FAISS vector store
+│   │   └── search.py       # Search logic
+│   ├── enrich/             # Enrich data with additional info (stub)
 │   │   └── __init__.py
-│   ├── transform/          # Transform data formats
+│   ├── transform/          # Transform data formats (stub)
 │   │   └── __init__.py
-│   ├── load/               # Load data to destinations
-│   │   └── __init__.py
-│   └── query/              # Query indexed data
+│   └── load/               # Load data to destinations (stub)
 │       └── __init__.py
 ├── streamlit_app/          # Visualization app (separate from core code)
 │   ├── app.py              # Streamlit dashboard
