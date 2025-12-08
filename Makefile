@@ -4,7 +4,8 @@
 .PHONY: help install test lint format clean \
 	run-extract run-migrate run-validate run-fix run-learn-patterns \
 	run-search-build run-search-query run-search-stats run-streamlit \
-	dev-install streamlit-install search-install
+	dev-install streamlit-install search-install \
+	streamlit search dev
 
 #
 # Help
@@ -12,6 +13,11 @@
 
 help:
 	@echo "Git Reading - Index and query reading notes"
+	@echo ""
+	@echo "Quick Start Workflows (auto-install dependencies):"
+	@echo "  make streamlit    - Install Streamlit deps and launch visualization app"
+	@echo "  make search       - Install search deps and build semantic search index"
+	@echo "  make dev          - Install dev deps and run tests"
 	@echo ""
 	@echo "Setup Commands:"
 	@echo "  make install             - Install the package and core dependencies"
@@ -33,25 +39,28 @@ help:
 	@echo "  make run-learn-patterns  - Learn validation patterns from corpus"
 	@echo ""
 	@echo "Search Commands:"
-	@echo "  make run-search-build    - Build semantic search vector index"
-	@echo "  make run-search-query    - Query the semantic search index"
-	@echo "  make run-search-stats    - Show search index statistics"
+	@echo "  make run-search-build    - Build semantic search vector index (requires: make search-install)"
+	@echo "  make run-search-query    - Query the semantic search index (requires: make search-install)"
+	@echo "  make run-search-stats    - Show search index statistics (requires: make search-install)"
 	@echo ""
 	@echo "Visualization:"
-	@echo "  make run-streamlit       - Launch Streamlit visualization app"
+	@echo "  make run-streamlit       - Launch Streamlit app (requires: make streamlit-install)"
 	@echo ""
 	@echo "Common Workflows:"
 	@echo "  # Extract notes and build search index"
 	@echo "  make run-extract"
-	@echo "  make run-search-build"
+	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
 	@echo ""
 	@echo "  # Validate and fix notes"
 	@echo "  make run-validate ARGS='--notes-dir readings --format json --output issues.json'"
 	@echo "  make run-fix ARGS='--validation issues.json --notes-dir readings'"
 	@echo ""
-	@echo "  # Migrate to database"
-	@echo "  make run-migrate ARGS='book_index.json readings.db'"
+	@echo "  # Launch visualization"
+	@echo "  make streamlit           # Auto-installs and launches"
+	@echo ""
+	@echo "Note: Individual run-* commands require manual dependency installation."
+	@echo "      Use Quick Start Workflows above for automatic setup."
 	@echo ""
 	@echo "For detailed command options, run: make <command> ARGS='--help'"
 
@@ -75,6 +84,22 @@ streamlit-install:
 search-install:
 	@echo "Installing with semantic search dependencies..."
 	uv pip install -e ".[search]"
+
+#
+# Quick Start Workflows (auto-install dependencies)
+#
+
+# Install Streamlit dependencies and launch visualization app
+streamlit: streamlit-install
+	@$(MAKE) run-streamlit
+
+# Install search dependencies and build semantic search index
+search: search-install
+	@$(MAKE) run-search-build
+
+# Install dev dependencies and run tests
+dev: dev-install
+	@$(MAKE) test
 
 #
 # Development
@@ -152,6 +177,7 @@ run-learn-patterns:
 #
 
 # Build semantic search vector index from JSON index
+# Requires: make search-install (or use: make search)
 # Default: reads from 'book_index.json', writes to '.faiss/' directory
 # Usage: make run-search-build
 #        make run-search-build ARGS='--index custom_index.json'
@@ -161,6 +187,7 @@ run-search-build:
 	PYTHONPATH=src uv run search build $(ARGS)
 
 # Query the semantic search index
+# Requires: make search-install
 # Usage: make run-search-query ARGS='"meaning of life"'
 #        make run-search-query ARGS='"philosophy" --top-k 10'
 #        make run-search-query ARGS='--help'
@@ -169,6 +196,7 @@ run-search-query:
 	PYTHONPATH=src uv run search query $(ARGS)
 
 # Show search index statistics
+# Requires: make search-install
 # Usage: make run-search-stats
 #        make run-search-stats ARGS='--help'
 run-search-stats:
@@ -180,6 +208,7 @@ run-search-stats:
 #
 
 # Launch Streamlit visualization app
+# Requires: make streamlit-install (or use: make streamlit)
 # Opens in browser at http://localhost:8501
 # Usage: make run-streamlit
 run-streamlit:
