@@ -10,37 +10,7 @@ from pathlib import Path
 
 from load.db_schema import create_database, get_connection
 
-
-def generate_book_id(title: str, author: str) -> str:
-    """Generate a stable book ID from title and author.
-
-    Args:
-        title: Book title
-        author: Book author
-
-    Returns:
-        Stable book ID
-    """
-    # Simple slug: lowercase, replace spaces with hyphens, remove special chars
-    slug = f"{author}_{title}".lower()
-    slug = "".join(c if c.isalnum() or c in " -_" else "" for c in slug)
-    slug = "-".join(slug.split())
-    return slug[:100]  # Limit length
-
-
-def generate_author_id(name: str) -> str:
-    """Generate a stable author ID from name.
-
-    Args:
-        name: Author name
-
-    Returns:
-        Stable author ID
-    """
-    slug = name.lower()
-    slug = "".join(c if c.isalnum() or c in " -_" else "" for c in slug)
-    slug = "-".join(slug.split())
-    return slug[:100]
+from .db_utils import generate_author, generate_author_id, generate_book_id
 
 
 def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
@@ -71,7 +41,8 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     chunks = []
     for book in books:
         title = book.get("title", "Unknown")
-        author = book.get("author", "Unknown")
+        first_name = book.get("author_first_name", "Unknown")
+        last_name = book.get("author_last_name", "Unknown")
         sections_data = book.get("sections", {})
 
         for section_name, excerpts in sections_data.items():
@@ -80,7 +51,8 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
                     chunks.append(
                         {
                             "title": title,
-                            "author": author,
+                            "author_first_name": first_name,
+                            "author_last_name": last_name,
                             "section": section_name,
                             "excerpt": excerpt,
                         }
@@ -112,16 +84,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         # Extract author name parts
         author_first_name = chunk.get("author_first_name", "")
         author_last_name = chunk.get("author_last_name", "")
-
-        # Generate full name for compatibility
-        if author_first_name and author_last_name:
-            author = f"{author_first_name} {author_last_name}"
-        elif author_last_name:
-            author = author_last_name
-        elif author_first_name:
-            author = author_first_name
-        else:
-            author = "Unknown"
+        author = generate_author(author_first_name, author_last_name)
 
         section = chunk.get("section", "")
         excerpt = chunk.get("excerpt", "")
