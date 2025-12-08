@@ -1,69 +1,101 @@
-.PHONY: help install test lint format clean run run-extract run-query run-transform run-validate run-learn-patterns run-fix run-streamlit run-search-build run-search-query run-search-stats run-migrate dev-install streamlit-install search-install
+# Git Reading - Makefile
+# Index and query reading notes from markdown files using git history
+
+.PHONY: help install test lint format clean \
+	run-extract run-migrate run-validate run-fix run-learn-patterns \
+	run-search-build run-search-query run-search-stats run-streamlit \
+	dev-install streamlit-install search-install
+
+#
+# Help
+#
 
 help:
-	@echo "Available commands:"
-	@echo "  make install          - Install the package"
-	@echo "  make dev-install      - Install dev dependencies"
-	@echo "  make streamlit-install - Install Streamlit dependencies"
-	@echo "  make search-install   - Install semantic search dependencies"
-	@echo "  make test             - Run tests"
-	@echo "  make lint             - Run linter"
-	@echo "  make format           - Format code"
-	@echo "  make clean            - Clean build artifacts"
+	@echo "Git Reading - Index and query reading notes"
 	@echo ""
-	@echo "Run commands (use current source code, no install needed):"
-	@echo "  make run              - Show available run commands"
-	@echo "  make run-extract      - Extract and index reading notes"
-	@echo "  make run-validate     - Validate markdown files"
-	@echo "  make run-fix          - Interactively apply fixes from validation JSON"
-	@echo "  make run-learn-patterns - Learn patterns from markdown corpus"
-	@echo "  make run-streamlit    - Launch Streamlit visualization app"
-	@echo "  make run-search-build - Build semantic search index"
-	@echo "  make run-search-query - Query semantic search index"
-	@echo "  make run-search-stats - Show search index statistics"
-	@echo "  make run-query        - Run query command (when implemented)"
-	@echo "  make run-transform    - Run transform command (when implemented)"
+	@echo "Setup Commands:"
+	@echo "  make install             - Install the package and core dependencies"
+	@echo "  make dev-install         - Install with dev dependencies (testing, linting)"
+	@echo "  make streamlit-install   - Install with Streamlit visualization dependencies"
+	@echo "  make search-install      - Install with semantic search dependencies"
 	@echo ""
-	@echo "Usage examples:"
-	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
-	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
-	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
-	@echo "  make run-validate ARGS='--format json --output validation.json'"
-	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes'"
-	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes -y'  # Auto-apply all fixes"
-	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
-	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
-	@echo "  make run-streamlit    # Launches visualization app at http://localhost:8501"
-	@echo "  make run-search-build # Build vector search index from .tmp/index.json"
-	@echo "  make run-search-query ARGS='\"meaning of life\"'  # Search for similar notes"
-	@echo "  make run-search-stats # Show search index statistics"
-	@echo "  make run-extract ARGS='--help'"
+	@echo "Development Commands:"
+	@echo "  make test                - Run all tests with pytest"
+	@echo "  make lint                - Check code with ruff linter"
+	@echo "  make format              - Format code with ruff"
+	@echo "  make clean               - Remove build artifacts and caches"
+	@echo ""
+	@echo "Data Pipeline Commands:"
+	@echo "  make run-extract         - Extract reading notes from markdown files"
+	@echo "  make run-migrate         - Migrate JSON index to SQLite database"
+	@echo "  make run-validate        - Validate markdown files against rules"
+	@echo "  make run-fix             - Interactively fix validation issues"
+	@echo "  make run-learn-patterns  - Learn validation patterns from corpus"
+	@echo ""
+	@echo "Search Commands:"
+	@echo "  make run-search-build    - Build semantic search vector index"
+	@echo "  make run-search-query    - Query the semantic search index"
+	@echo "  make run-search-stats    - Show search index statistics"
+	@echo ""
+	@echo "Visualization:"
+	@echo "  make run-streamlit       - Launch Streamlit visualization app"
+	@echo ""
+	@echo "Common Workflows:"
+	@echo "  # Extract notes and build search index"
+	@echo "  make run-extract"
+	@echo "  make run-search-build"
+	@echo "  make run-search-query ARGS='\"meaning of life\"'"
+	@echo ""
+	@echo "  # Validate and fix notes"
+	@echo "  make run-validate ARGS='--notes-dir readings --format json --output issues.json'"
+	@echo "  make run-fix ARGS='--validation issues.json --notes-dir readings'"
+	@echo ""
+	@echo "  # Migrate to database"
+	@echo "  make run-migrate ARGS='book_index.json readings.db'"
+	@echo ""
+	@echo "For detailed command options, run: make <command> ARGS='--help'"
+
+#
+# Installation
+#
 
 install:
+	@echo "Installing git-reading package..."
 	uv pip install .
 
 dev-install:
+	@echo "Installing with dev dependencies..."
 	uv sync --extra dev --extra test
 	uv pip install .
 
 streamlit-install:
+	@echo "Installing with Streamlit dependencies..."
 	uv pip install -e ".[streamlit]"
 
 search-install:
+	@echo "Installing with semantic search dependencies..."
 	uv pip install -e ".[search]"
 
+#
+# Development
+#
+
 test:
+	@echo "Running tests..."
 	uv pip install .
 	uv run pytest -v
 
 lint:
+	@echo "Running linter..."
 	uv run ruff check .
 
 format:
+	@echo "Formatting code..."
 	uv run ruff format .
 	uv run ruff check --fix .
 
 clean:
+	@echo "Cleaning build artifacts..."
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info
@@ -72,85 +104,84 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-# Run commands with current source code without reinstalling
-# These use PYTHONPATH=src to run code directly from source
+#
+# Data Pipeline
+#
 
-# Extract command - index reading notes
+# Extract reading notes from markdown files into JSON index
+# Default: reads from 'readings/' directory, writes to 'book_index.json'
+# Usage: make run-extract
+#        make run-extract ARGS='--notes-dir /path/to/notes --output index.json'
+#        make run-extract ARGS='--help'
 run-extract:
+	@echo "Extracting reading notes..."
 	PYTHONPATH=src uv run extract readings $(ARGS)
 
-# Validate command - validate markdown files
-run-validate:
-	PYTHONPATH=src uv run normalize validate $(ARGS)
-
-# Fix command - interactively apply fixes from validation JSON
-run-fix:
-	PYTHONPATH=src uv run normalize fix $(ARGS)
-
-# Learn patterns command - learn patterns from corpus
-run-learn-patterns:
-	PYTHONPATH=src uv run python -m normalize_source.main learn $(ARGS)
-
-# Query command (placeholder for future implementation)
-run-query:
-	@echo "Query command not yet implemented"
-	@echo "When ready, will run: PYTHONPATH=src uv run query-readings $(ARGS)"
-
-# Search commands - semantic search functionality
-
-# Build vector search index
-run-search-build:
-	PYTHONPATH=src uv run search build $(ARGS)
-
-# Query vector search index
-run-search-query:
-	PYTHONPATH=src uv run search query $(ARGS)
-
-# Show vector store statistics
-run-search-stats:
-	PYTHONPATH=src uv run search stats $(ARGS)
-
-# Transform command (placeholder for future implementation)
-run-transform:
-	@echo "Transform command not yet implemented"
-	@echo "When ready, will run: PYTHONPATH=src uv run transform-readings $(ARGS)"
-
-# Streamlit visualization app
-run-streamlit:
-	uv run streamlit run streamlit_app/app.py
-
 # Migrate JSON index to SQLite database
+# Usage: make run-migrate ARGS='input.json output.db'
+#        make run-migrate ARGS='--help'
 run-migrate:
+	@echo "Migrating to database..."
 	PYTHONPATH=src uv run load-db migrate $(ARGS)
 
-# Show available run commands when 'make run' is called without a specific target
-run:
-	@echo "Available run commands:"
-	@echo ""
-	@echo "  make run-extract ARGS='...'         - Extract and index reading notes"
-	@echo "  make run-validate ARGS='...'        - Validate markdown files"
-	@echo "  make run-fix ARGS='...'             - Interactively apply fixes from validation JSON"
-	@echo "  make run-learn-patterns ARGS='...'  - Learn patterns from corpus"
-	@echo "  make run-streamlit                  - Launch Streamlit visualization app"
-	@echo "  make run-search-build ARGS='...'    - Build semantic search index"
-	@echo "  make run-search-query ARGS='...'    - Query semantic search index"
-	@echo "  make run-search-stats ARGS='...'    - Show search index statistics"
-	@echo "  make run-query ARGS='...'           - Run query command (not yet implemented)"
-	@echo "  make run-transform ARGS='...'       - Run transform command (not yet implemented)"
-	@echo ""
-	@echo "Examples:"
-	@echo "  make run-extract ARGS='--notes-dir /path/to/notes --output index.json'"
-	@echo "  make run-validate ARGS='--notes-dir /path/to/notes'"
-	@echo "  make run-validate ARGS='--notes-dir /path/to/notes --output validation-report.txt'"
-	@echo "  make run-validate ARGS='--format json --output validation.json'"
-	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes'"
-	@echo "  make run-fix ARGS='--validation validation.json --notes-dir /path/to/notes -y'  # Auto-apply all fixes"
-	@echo "  make run-learn-patterns ARGS='--notes-dir /path/to/notes --output patterns.json'"
-	@echo "  make run-validate ARGS='--use-patterns --patterns patterns.json'"
-	@echo "  make run-streamlit                  # Opens http://localhost:8501"
-	@echo "  make run-search-build               # Build index from .tmp/index.json"
-	@echo "  make run-search-query ARGS='\"your query\"'  # Search for similar content"
-	@echo "  make run-search-stats               # View index statistics"
-	@echo "  make run-extract ARGS='--help'"
-	@echo ""
-	@echo "Tip: These commands run your current source code without reinstalling."
+# Validate markdown files against normalization rules
+# Usage: make run-validate ARGS='--notes-dir readings'
+#        make run-validate ARGS='--notes-dir readings --format json --output issues.json'
+#        make run-validate ARGS='--help'
+run-validate:
+	@echo "Validating markdown files..."
+	PYTHONPATH=src uv run normalize validate $(ARGS)
+
+# Interactively apply fixes from validation JSON
+# Usage: make run-fix ARGS='--validation issues.json --notes-dir readings'
+#        make run-fix ARGS='--validation issues.json --notes-dir readings -y'  # Auto-apply
+#        make run-fix ARGS='--help'
+run-fix:
+	@echo "Applying fixes..."
+	PYTHONPATH=src uv run normalize fix $(ARGS)
+
+# Learn validation patterns from markdown corpus
+# Usage: make run-learn-patterns ARGS='--notes-dir readings --output patterns.json'
+#        make run-learn-patterns ARGS='--help'
+run-learn-patterns:
+	@echo "Learning patterns..."
+	PYTHONPATH=src uv run python -m normalize_source.main learn $(ARGS)
+
+#
+# Semantic Search
+#
+
+# Build semantic search vector index from JSON index
+# Default: reads from 'book_index.json', writes to '.faiss/' directory
+# Usage: make run-search-build
+#        make run-search-build ARGS='--index custom_index.json'
+#        make run-search-build ARGS='--help'
+run-search-build:
+	@echo "Building search index..."
+	PYTHONPATH=src uv run search build $(ARGS)
+
+# Query the semantic search index
+# Usage: make run-search-query ARGS='"meaning of life"'
+#        make run-search-query ARGS='"philosophy" --top-k 10'
+#        make run-search-query ARGS='--help'
+run-search-query:
+	@echo "Querying search index..."
+	PYTHONPATH=src uv run search query $(ARGS)
+
+# Show search index statistics
+# Usage: make run-search-stats
+#        make run-search-stats ARGS='--help'
+run-search-stats:
+	@echo "Search index statistics:"
+	PYTHONPATH=src uv run search stats $(ARGS)
+
+#
+# Visualization
+#
+
+# Launch Streamlit visualization app
+# Opens in browser at http://localhost:8501
+# Usage: make run-streamlit
+run-streamlit:
+	@echo "Launching Streamlit app at http://localhost:8501..."
+	uv run streamlit run streamlit_app/app.py
