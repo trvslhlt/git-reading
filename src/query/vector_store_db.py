@@ -14,7 +14,10 @@ from typing import Any
 import faiss
 import numpy as np
 
+from common.logger import get_logger
 from load.db_schema import get_connection
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -255,11 +258,11 @@ class VectorStoreDB:
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
-        print(f"Saved vector store to {directory}")
-        print(f"  - {self.index.ntotal} vectors")
-        print(f"  - {num_chunks} chunks in database")
-        print(f"  - {num_authors} authors")
-        print(f"  - {num_books} books")
+        logger.info(f"Saved vector store to {directory}")
+        logger.info(f"  - [bold]{self.index.ntotal}[/bold] vectors")
+        logger.info(f"  - [bold]{num_chunks}[/bold] chunks in database")
+        logger.info(f"  - [bold]{num_authors}[/bold] authors")
+        logger.info(f"  - [bold]{num_books}[/bold] books")
 
     @classmethod
     def load(cls, directory: Path) -> "VectorStoreDB":
@@ -287,9 +290,9 @@ class VectorStoreDB:
         index_path = directory / "faiss.index"
         store.index = faiss.read_index(str(index_path))
 
-        print(f"Loaded vector store from {directory}")
-        print(f"  - {store.index.ntotal} vectors")
-        print(f"  - Database: {db_path}")
+        logger.info(f"Loaded vector store from {directory}")
+        logger.info(f"  - [bold]{store.index.ntotal}[/bold] vectors")
+        logger.info(f"  - Database: {db_path}")
 
         return store
 

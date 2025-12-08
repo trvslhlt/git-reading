@@ -2,7 +2,11 @@
 
 import json
 
+from common.logger import get_logger
+
 from .models import IssueSeverity, ValidationResult
+
+logger = get_logger(__name__)
 
 
 class ValidationReporter:
@@ -33,15 +37,15 @@ class ValidationReporter:
             if result.is_clean:
                 continue
 
-            print(f"\n{result.file_path.name}:")
+            logger.info(f"\n{result.file_path.name}:")
 
             for issue in result.issues:
                 if issue.severity == IssueSeverity.ERROR:
                     total_errors += 1
-                    icon = "✗"
+                    icon = "[red]✗[/red]"
                 elif issue.severity == IssueSeverity.WARNING:
                     total_warnings += 1
-                    icon = "⚠"
+                    icon = "[yellow]⚠[/yellow]"
                 else:
                     total_info += 1
                     icon = "ℹ"
@@ -49,14 +53,16 @@ class ValidationReporter:
                 if not self.show_info and issue.severity == IssueSeverity.INFO:
                     continue
 
-                print(f"  {icon} Line {issue.line_number}: {issue.message}")
-                print(f"      {issue.context}")
+                logger.info(f"  {icon} Line [bold]{issue.line_number}[/bold]: {issue.message}")
+                logger.info(f"      {issue.context}")
                 if issue.suggestion:
-                    print(f"      Suggestion: {issue.suggestion}")
+                    logger.info(f"      Suggestion: {issue.suggestion}")
 
         # Summary
-        print("\n" + "=" * 60)
-        print(f"Total: {total_errors} errors, {total_warnings} warnings, {total_info} info")
+        logger.info("\n" + "=" * 60)
+        logger.info(
+            f"Total: [bold]{total_errors}[/bold] errors, [bold]{total_warnings}[/bold] warnings, [bold]{total_info}[/bold] info"
+        )
 
         if total_errors > 0:
             return 1  # Exit code for errors

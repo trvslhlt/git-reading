@@ -6,10 +6,14 @@ import io
 import sys
 from pathlib import Path
 
+from common.logger import get_logger
+
 from .interactive_fixer import InteractiveFixer
 from .patterns.learner import PatternLearner
 from .reporters import ValidationReporter
 from .validator import MarkdownValidator
+
+logger = get_logger(__name__)
 
 
 def cmd_validate(args):
@@ -24,7 +28,7 @@ def cmd_validate(args):
     notes_dir = Path(args.notes_dir)
 
     if not notes_dir.exists():
-        print(f"Error: Directory '{notes_dir}' does not exist")
+        logger.error(f"Directory '{notes_dir}' does not exist")
         return 1
 
     validator = MarkdownValidator(
@@ -41,7 +45,7 @@ def cmd_validate(args):
         if args.output:
             output_path = Path(args.output)
             output_path.write_text(output, encoding="utf-8")
-            print(f"Validation results written to {output_path}")
+            logger.info(f"[green]✓[/green] Validation results written to {output_path}")
             return 0
         else:
             print(output)
@@ -62,7 +66,7 @@ def cmd_validate(args):
                 # Also print to console
                 sys.stdout = old_stdout
                 print(output, end="")
-                print(f"\nValidation results also written to {output_path}")
+                logger.info(f"\n[green]✓[/green] Validation results also written to {output_path}")
                 return exit_code
             finally:
                 sys.stdout = old_stdout
@@ -83,21 +87,21 @@ def cmd_learn(args):
     output_path = Path(args.output)
 
     if not notes_dir.exists():
-        print(f"Error: Directory '{notes_dir}' does not exist")
+        logger.error(f"Directory '{notes_dir}' does not exist")
         return 1
 
-    print(f"Learning patterns from {notes_dir}...")
+    logger.info(f"Learning patterns from {notes_dir}...")
     learner = PatternLearner()
     pattern_store = learner.learn_from_directory(notes_dir)
 
     pattern_store.save(output_path)
-    print(f"Patterns saved to {output_path}")
+    logger.info(f"[green]✓[/green] Patterns saved to {output_path}")
 
     # Print summary
     for pattern_type, patterns in pattern_store.patterns.items():
-        print(f"\n{pattern_type.upper()}:")
+        logger.info(f"\n{pattern_type.upper()}:")
         for p in patterns[:5]:  # Top 5
-            print(f"  - {p.value} (freq={p.frequency}, conf={p.confidence:.2f})")
+            logger.info(f"  - {p.value} (freq=[bold]{p.frequency}[/bold], conf={p.confidence:.2f})")
 
     return 0
 
@@ -115,11 +119,11 @@ def cmd_fix(args):
     notes_dir = Path(args.notes_dir)
 
     if not validation_json.exists():
-        print(f"Error: Validation JSON file '{validation_json}' does not exist")
+        logger.error(f"Validation JSON file '{validation_json}' does not exist")
         return 1
 
     if not notes_dir.exists():
-        print(f"Error: Notes directory '{notes_dir}' does not exist")
+        logger.error(f"Notes directory '{notes_dir}' does not exist")
         return 1
 
     try:
@@ -132,7 +136,7 @@ def cmd_fix(args):
 
         return 0
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         return 1
 
 

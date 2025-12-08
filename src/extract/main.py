@@ -11,6 +11,10 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from common.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def get_git_date_for_line(filepath: Path, line_content: str, repo_root: Path) -> str | None:
     """
@@ -213,29 +217,29 @@ def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None)
     if git_dir:
         repo_root = git_dir.resolve()
         if not (repo_root / ".git").exists():
-            print(f"Warning: {repo_root} does not appear to be a git repository")
-            print("Date information will not be available.")
+            logger.warning(f"{repo_root} does not appear to be a git repository")
+            logger.warning("Date information will not be available.")
             repo_root = None
     else:
         repo_root = find_git_root(notes_dir)
         if not repo_root:
-            print(f"Warning: No git repository found at or above {notes_dir}")
-            print("Date information will not be available.")
+            logger.warning(f"No git repository found at or above {notes_dir}")
+            logger.warning("Date information will not be available.")
 
     all_books = []
     md_files = sorted(notes_dir.glob("*.md"))
 
     if not md_files:
-        print(f"No markdown files found in {notes_dir}")
+        logger.warning(f"No markdown files found in {notes_dir}")
         return
 
-    print(f"Found {len(md_files)} markdown file(s)")
+    logger.info(f"Found [bold]{len(md_files)}[/bold] markdown file(s)")
 
     for md_file in md_files:
-        print(f"  Parsing {md_file.name}...")
+        logger.debug(f"Parsing {md_file.name}...")
         books = parse_markdown_file(md_file, repo_root)
         all_books.extend(books)
-        print(f"    Found {len(books)} book(s)")
+        logger.debug(f"  Found {len(books)} book(s)")
 
     # Sort by date_read (None values at end)
     all_books.sort(key=lambda b: (b["date_read"] is None, b["date_read"] or ""))
@@ -248,4 +252,6 @@ def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None)
     }
 
     output_path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\nWrote index with {len(all_books)} books to {output_path}")
+    logger.info(
+        f"[green]✓[/green] Wrote index with [bold]{len(all_books)}[/bold] books to {output_path}"
+    )

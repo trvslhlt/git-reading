@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Index reading notes from markdown files using git history"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "rich>=13.0.0",  # Beautiful CLI output and logging
+]
 
 [project.optional-dependencies]
 test = [
@@ -37,6 +39,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
+    "src/common",
     "src/extract",
     "src/enrich",
     "src/load",
@@ -72,7 +75,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["extract", "enrich", "load", "normalize_source", "query", "transform", "search"]
+known-first-party = ["common", "extract", "enrich", "load", "normalize_source", "query", "transform", "search"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B", "F401", "F811"]
