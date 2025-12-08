@@ -50,13 +50,13 @@ def main():
         "--index",
         "-i",
         required=True,
-        help="Path to JSON index file (default: .tmp/index.json)",
+        help="Path to JSON index file",
     )
     migrate_parser.add_argument(
         "--database",
         "-d",
         required=True,
-        help="Path to SQLite database file (default: .tmp/readings.db)",
+        help="Path to SQLite database file",
     )
     migrate_parser.add_argument(
         "--force",
