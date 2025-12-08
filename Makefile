@@ -48,7 +48,7 @@ help:
 	@echo ""
 	@echo "Common Workflows:"
 	@echo "  # Extract notes and build search index"
-	@echo "  make run-extract"
+	@echo "  make run-extract ARGS='--notes-dir readings --output book_index.json'"
 	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
 	@echo ""
@@ -59,7 +59,9 @@ help:
 	@echo "  # Launch visualization"
 	@echo "  make streamlit           # Auto-installs and launches"
 	@echo ""
-	@echo "Note: Individual run-* commands require manual dependency installation."
+	@echo "Note: Commands that read/write files (run-extract, run-migrate, run-validate,"
+	@echo "      run-learn-patterns) REQUIRE explicit ARGS to prevent accidents."
+	@echo "      Individual run-* commands require manual dependency installation."
 	@echo "      Use Quick Start Workflows above for automatic setup."
 	@echo ""
 	@echo "For detailed command options, run: make <command> ARGS='--help'"
@@ -134,30 +136,60 @@ clean:
 #
 
 # Extract reading notes from markdown files into JSON index
-# Default: reads from 'readings/' directory, writes to 'book_index.json'
-# Usage: make run-extract
-#        make run-extract ARGS='--notes-dir /path/to/notes --output index.json'
+# REQUIRES ARGS to prevent accidental file operations
+# CLI requires: --notes-dir (required at CLI level)
+# Usage: make run-extract ARGS='--notes-dir readings --output book_index.json'
 #        make run-extract ARGS='--help'
 run-extract:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "❌ Error: ARGS required to prevent accidental file operations"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make run-extract ARGS='--notes-dir readings --output book_index.json'"; \
+		echo "  make run-extract ARGS='--help'"; \
+		exit 1; \
+	fi
 	@echo "Extracting reading notes..."
 	PYTHONPATH=src uv run extract readings $(ARGS)
 
 # Migrate JSON index to SQLite database
-# Usage: make run-migrate ARGS='input.json output.db'
+# REQUIRES ARGS to prevent accidental file operations
+# CLI requires: --index, --database (both required at CLI level)
+# Usage: make run-migrate ARGS='--index book_index.json --database readings.db'
 #        make run-migrate ARGS='--help'
 run-migrate:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "❌ Error: ARGS required to prevent accidental file operations"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make run-migrate ARGS='--index book_index.json --database readings.db'"; \
+		echo "  make run-migrate ARGS='--help'"; \
+		exit 1; \
+	fi
 	@echo "Migrating to database..."
 	PYTHONPATH=src uv run load-db migrate $(ARGS)
 
 # Validate markdown files against normalization rules
+# REQUIRES ARGS to prevent accidental file operations
+# CLI requires: --notes-dir (required at CLI level)
 # Usage: make run-validate ARGS='--notes-dir readings'
 #        make run-validate ARGS='--notes-dir readings --format json --output issues.json'
 #        make run-validate ARGS='--help'
 run-validate:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "❌ Error: ARGS required to prevent accidental file operations"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make run-validate ARGS='--notes-dir readings'"; \
+		echo "  make run-validate ARGS='--notes-dir readings --format json --output issues.json'"; \
+		echo "  make run-validate ARGS='--help'"; \
+		exit 1; \
+	fi
 	@echo "Validating markdown files..."
 	PYTHONPATH=src uv run normalize validate $(ARGS)
 
 # Interactively apply fixes from validation JSON
+# CLI requires: --validation, --notes-dir (both required at CLI level)
 # Usage: make run-fix ARGS='--validation issues.json --notes-dir readings'
 #        make run-fix ARGS='--validation issues.json --notes-dir readings -y'  # Auto-apply
 #        make run-fix ARGS='--help'
@@ -166,9 +198,19 @@ run-fix:
 	PYTHONPATH=src uv run normalize fix $(ARGS)
 
 # Learn validation patterns from markdown corpus
+# REQUIRES ARGS to prevent accidental file operations
+# CLI requires: --notes-dir (required at CLI level)
 # Usage: make run-learn-patterns ARGS='--notes-dir readings --output patterns.json'
 #        make run-learn-patterns ARGS='--help'
 run-learn-patterns:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "❌ Error: ARGS required to prevent accidental file operations"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make run-learn-patterns ARGS='--notes-dir readings --output patterns.json'"; \
+		echo "  make run-learn-patterns ARGS='--help'"; \
+		exit 1; \
+	fi
 	@echo "Learning patterns..."
 	PYTHONPATH=src uv run python -m normalize_source.main learn $(ARGS)
 

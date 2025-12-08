@@ -49,14 +49,14 @@ def main():
     migrate_parser.add_argument(
         "--index",
         "-i",
-        default=".tmp/index.json",
-        help="Path to JSON index file (default: .tmp/index.json)",
+        required=True,
+        help="Path to JSON index file",
     )
     migrate_parser.add_argument(
         "--database",
         "-d",
-        default=".tmp/readings.db",
-        help="Path to SQLite database file (default: .tmp/readings.db)",
+        required=True,
+        help="Path to SQLite database file",
     )
     migrate_parser.add_argument(
         "--force",

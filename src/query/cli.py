@@ -122,14 +122,14 @@ def main():
     build_parser.add_argument(
         "--index",
         "-i",
-        default=".tmp/index.json",
-        help="Path to JSON index file (default: .tmp/index.json)",
+        required=True,
+        help="Path to JSON index file",
     )
     build_parser.add_argument(
         "--output",
         "-o",
-        default=".tmp/vector_store",
-        help="Output directory for vector store (default: .tmp/vector_store)",
+        required=True,
+        help="Output directory for vector store",
     )
     build_parser.add_argument(
         "--model",
@@ -156,7 +156,7 @@ def main():
         "--vector-store",
         "-v",
         default=".tmp/vector_store",
-        help="Path to vector store directory (default: .tmp/vector_store)",
+        help="Path to vector store directory",
     )
     search_parser.add_argument(
         "--top-k",
@@ -192,7 +192,7 @@ def main():
         "--vector-store",
         "-v",
         default=".tmp/vector_store",
-        help="Path to vector store directory (default: .tmp/vector_store)",
+        help="Path to vector store directory",
     )
 
     args = parser.parse_args()
