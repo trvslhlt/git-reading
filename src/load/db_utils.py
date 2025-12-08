@@ -1,7 +1,3 @@
-def author_id():
-    return "CONCAT(last_name, first_name)"
-
-
 def generate_author(first_name, last_name):
     """Generate author name from first and last name.
 
