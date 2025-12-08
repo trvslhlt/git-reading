@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from common.constants import CANONICAL_SECTIONS
 from common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -140,29 +141,13 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
             books.append(current_book)
         current_book = None
 
-    # Section names that shouldn't be treated as book titles
-    section_names = {
-        "terms",
-        "notes",
-        "excerpts",
-        "threads",
-        "ideas",
-        "representations",
-        "images",
-        "same time",
-        "thread",
-        "note",
-        "excerpt",
-        "term",
-    }
-
     for line in lines:
         # Check for book title (# Title)
         if line.startswith("# ") and not line.startswith("## "):
             potential_title = line[2:].strip()
 
             # Skip if this looks like a section name, not a book title
-            if potential_title.lower() in section_names:
+            if potential_title.lower() in CANONICAL_SECTIONS:
                 # Treat it as a section under the current book
                 save_current_section()
                 current_section = potential_title

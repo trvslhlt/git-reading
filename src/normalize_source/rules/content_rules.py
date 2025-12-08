@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from ..constants import CANONICAL_SECTIONS
+from common.constants import CANONICAL_SECTIONS
+
 from ..models import Issue, IssueSeverity
 
 
