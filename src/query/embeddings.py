@@ -8,6 +8,10 @@ using pre-trained sentence transformer models.
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+from common.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class EmbeddingModel:
     """Wrapper for sentence transformer embedding model."""
@@ -23,10 +27,10 @@ class EmbeddingModel:
                        - 'all-mpnet-base-v2': Higher quality, slower
                        - 'paraphrase-multilingual-MiniLM-L12-v2': Multilingual support
         """
-        print(f"Loading embedding model: {model_name}")
+        logger.info(f"Loading embedding model: [bold]{model_name}[/bold]")
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
-        print(f"Model loaded. Embedding dimension: {self.get_dimension()}")
+        logger.info(f"Model loaded. Embedding dimension: [bold]{self.get_dimension()}[/bold]")
 
     def get_dimension(self) -> int:
         """Get the dimension of the embeddings produced by this model."""

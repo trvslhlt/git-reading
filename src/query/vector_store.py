@@ -14,6 +14,10 @@ from typing import Any
 import faiss
 import numpy as np
 
+from common.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class TextChunk:
@@ -238,11 +242,11 @@ class VectorStore:
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
 
-        print(f"Saved filtered vector store to {directory}")
-        print(f"  - {self.index.ntotal} vectors")
-        print(f"  - {len(self.chunks)} chunks")
-        print(f"  - {len(self.author_to_indices)} authors")
-        print(f"  - {len(self.section_to_indices)} sections")
+        logger.info(f"Saved filtered vector store to {directory}")
+        logger.info(f"  - [bold]{self.index.ntotal}[/bold] vectors")
+        logger.info(f"  - [bold]{len(self.chunks)}[/bold] chunks")
+        logger.info(f"  - [bold]{len(self.author_to_indices)}[/bold] authors")
+        logger.info(f"  - [bold]{len(self.section_to_indices)}[/bold] sections")
 
     @classmethod
     def load(cls, directory: Path) -> "VectorStore":
@@ -282,10 +286,10 @@ class VectorStore:
             store.section_to_indices = lookups["section_to_indices"]
             store.book_to_indices = lookups["book_to_indices"]
 
-        print(f"Loaded filtered vector store from {directory}")
-        print(f"  - {store.index.ntotal} vectors")
-        print(f"  - {len(store.chunks)} chunks")
-        print(f"  - {len(store.author_to_indices)} authors indexed")
+        logger.info(f"Loaded filtered vector store from {directory}")
+        logger.info(f"  - [bold]{store.index.ntotal}[/bold] vectors")
+        logger.info(f"  - [bold]{len(store.chunks)}[/bold] chunks")
+        logger.info(f"  - [bold]{len(store.author_to_indices)}[/bold] authors indexed")
 
         return store
 

@@ -8,8 +8,11 @@ created by the extract module.
 import json
 from pathlib import Path
 
+from common.logger import get_logger
 from query.embeddings import EmbeddingModel
 from query.vector_store import TextChunk, VectorStore
+
+logger = get_logger(__name__)
 
 
 def build_search_index(
@@ -28,12 +31,12 @@ def build_search_index(
         sections_to_index: List of section names to index (e.g., ["notes", "excerpts"])
                           If None, indexes all sections
     """
-    print(f"Loading index from {index_path}")
+    logger.info(f"Loading index from {index_path}")
     with open(index_path) as f:
         index_data = json.load(f)
 
     books = index_data.get("books", [])
-    print(f"Found {len(books)} books in index")
+    logger.info(f"Found [bold]{len(books)}[/bold] books in index")
 
     # Initialize embedding model
     model = EmbeddingModel(model_name=model_name)
@@ -42,7 +45,7 @@ def build_search_index(
     chunks: list[TextChunk] = []
     texts: list[str] = []
 
-    print("Extracting text chunks...")
+    logger.info("Extracting text chunks...")
     for book in books:
         title = book.get("title", "Unknown")
         author_first_name = book.get("author_first_name", "")
@@ -73,18 +76,18 @@ def build_search_index(
                 chunks.append(chunk)
                 texts.append(item)
 
-    print(f"Extracted {len(chunks)} text chunks")
+    logger.info(f"Extracted [bold]{len(chunks)}[/bold] text chunks")
 
     if not chunks:
-        print("No text chunks found. Make sure your index has content in sections.")
+        logger.warning("No text chunks found. Make sure your index has content in sections.")
         return
 
     # Generate embeddings
-    print("Generating embeddings...")
+    logger.info("Generating embeddings...")
     embeddings = model.encode(texts, show_progress=True)
 
     # Create vector store
-    print("Building vector store...")
+    logger.info("Building vector store...")
     store = VectorStore(dimension=model.get_dimension())
     store.add(embeddings, chunks)
 
@@ -102,10 +105,10 @@ def build_search_index(
     with open(output_dir / "model_info.json", "w") as f:
         json.dump(model_info, f, indent=2)
 
-    print("\n✓ Search index built successfully!")
-    print(f"  Model: {model_name}")
-    print(f"  Chunks indexed: {len(chunks)}")
-    print(f"  Saved to: {output_dir}")
+    logger.info("\n[green]✓[/green] Search index built successfully!")
+    logger.info(f"  Model: [bold]{model_name}[/bold]")
+    logger.info(f"  Chunks indexed: [bold]{len(chunks)}[/bold]")
+    logger.info(f"  Saved to: {output_dir}")
 
 
 def search_notes(
@@ -134,14 +137,14 @@ def search_notes(
         model_info = json.load(f)
 
     # Load vector store
-    print(f"Loading vector store from {vector_store_dir}")
+    logger.info(f"Loading vector store from {vector_store_dir}")
     store = VectorStore.load(vector_store_dir)
 
     # Initialize embedding model
     model = EmbeddingModel(model_name=model_info["model_name"])
 
     # Encode query
-    print(f'Searching for: "{query}"')
+    logger.info(f'Searching for: "[bold]{query}[/bold]"')
     query_embedding = model.encode_single(query)
 
     # Search with pre-filtering (filtering happens inside VectorStore)

@@ -2,7 +2,11 @@
 
 from pathlib import Path
 
+from common.logger import get_logger
+
 from .models import Issue
+
+logger = get_logger(__name__)
 
 
 class MarkdownFixer:
@@ -36,12 +40,12 @@ class MarkdownFixer:
         try:
             lines = file_path.read_text(encoding="utf-8").splitlines(keepends=True)
         except Exception as e:
-            print(f"Error reading {file_path}: {e}")
+            logger.error(f"Error reading {file_path}: {e}")
             return False
 
         # Check if line number is valid
         if line_number < 1 or line_number > len(lines):
-            print(f"Invalid line number {line_number} in {file_path}")
+            logger.error(f"Invalid line number {line_number} in {file_path}")
             return False
 
         # Get the line (convert to 0-indexed)
@@ -50,9 +54,9 @@ class MarkdownFixer:
 
         # Verify the line matches the context (safety check)
         if original_line.strip() != issue.context.strip():
-            print(f"Warning: Line {line_number} in {file_path} doesn't match expected context")
-            print(f"  Expected: {issue.context}")
-            print(f"  Found: {original_line}")
+            logger.warning(f"Line {line_number} in {file_path} doesn't match expected context")
+            logger.warning(f"  Expected: {issue.context}")
+            logger.warning(f"  Found: {original_line}")
             return False
 
         # Apply the fix (preserve original line ending)
@@ -66,7 +70,7 @@ class MarkdownFixer:
                 self.files_modified.add(file_path)
                 return True
             except Exception as e:
-                print(f"Error writing {file_path}: {e}")
+                logger.error(f"Error writing {file_path}: {e}")
                 return False
         else:
             # In dry run, just mark as modified

@@ -3,8 +3,12 @@
 import json
 from pathlib import Path
 
+from common.logger import get_logger
+
 from .fixer import MarkdownFixer
 from .models import Issue, IssueSeverity
+
+logger = get_logger(__name__)
 
 
 class InteractiveFixer:
@@ -59,10 +63,10 @@ class InteractiveFixer:
             Dictionary with statistics about fixes applied
         """
         if not self.issues_with_suggestions:
-            print("No issues with suggestions found.")
+            logger.info("No issues with suggestions found.")
             return {"total": 0, "applied": 0, "skipped": 0, "failed": 0}
 
-        print(f"\nFound {len(self.issues_with_suggestions)} fixable issues.\n")
+        logger.info(f"\nFound [bold]{len(self.issues_with_suggestions)}[/bold] fixable issues.\n")
 
         fixer = MarkdownFixer(dry_run=False)
         stats = {
@@ -73,11 +77,13 @@ class InteractiveFixer:
         }
 
         for i, issue in enumerate(self.issues_with_suggestions, 1):
-            print(f"[{i}/{stats['total']}] {issue.file_path}:{issue.line_number}")
-            print(f"  Rule: {issue.rule_id}")
-            print(f"  Message: {issue.message}")
-            print(f"  Current: {issue.context}")
-            print(f"  Suggestion: {issue.suggestion}")
+            logger.info(
+                f"[[bold]{i}[/bold]/[bold]{stats['total']}[/bold]] {issue.file_path}:{issue.line_number}"
+            )
+            logger.info(f"  Rule: {issue.rule_id}")
+            logger.info(f"  Message: {issue.message}")
+            logger.info(f"  Current: {issue.context}")
+            logger.info(f"  Suggestion: {issue.suggestion}")
 
             if auto_yes:
                 choice = "y"
@@ -85,33 +91,33 @@ class InteractiveFixer:
                 choice = input("\nApply this fix? [y/n/q (quit)] ").strip().lower()
 
             if choice == "q":
-                print("\nQuitting...")
+                logger.info("\nQuitting...")
                 break
             elif choice == "y":
                 if fixer.apply_fix(issue):
-                    print("✓ Applied")
+                    logger.info("[green]✓[/green] Applied")
                     stats["applied"] += 1
                 else:
-                    print("✗ Failed to apply")
+                    logger.info("[red]✗[/red] Failed to apply")
                     stats["failed"] += 1
             else:
-                print("Skipped")
+                logger.info("Skipped")
                 stats["skipped"] += 1
 
-            print()  # Blank line between issues
+            logger.info("")  # Blank line between issues
 
         # Summary
-        print("\n" + "=" * 60)
-        print("Fix Summary:")
-        print(f"  Total fixable issues: {stats['total']}")
-        print(f"  Applied: {stats['applied']}")
-        print(f"  Skipped: {stats['skipped']}")
-        print(f"  Failed: {stats['failed']}")
+        logger.info("\n" + "=" * 60)
+        logger.info("Fix Summary:")
+        logger.info(f"  Total fixable issues: [bold]{stats['total']}[/bold]")
+        logger.info(f"  Applied: [green][bold]{stats['applied']}[/bold][/green]")
+        logger.info(f"  Skipped: [bold]{stats['skipped']}[/bold]")
+        logger.info(f"  Failed: [red][bold]{stats['failed']}[/bold][/red]")
 
         modified_files = fixer.get_modified_files()
         if modified_files:
-            print(f"\nModified {len(modified_files)} file(s):")
+            logger.info(f"\nModified [bold]{len(modified_files)}[/bold] file(s):")
             for file_path in sorted(modified_files):
-                print(f"  - {file_path}")
+                logger.info(f"  - {file_path}")
 
         return stats

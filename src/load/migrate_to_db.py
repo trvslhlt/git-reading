@@ -8,9 +8,12 @@ import json
 import sqlite3
 from pathlib import Path
 
+from common.logger import get_logger
 from load.db_schema import create_database, get_connection
 
 from .db_utils import generate_author, generate_author_id, generate_book_id
+
+logger = get_logger(__name__)
 
 
 def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
@@ -29,13 +32,13 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
 
     # Load JSON data
     if verbose:
-        print(f"Loading data from {json_path}...")
+        logger.info(f"Loading data from {json_path}...")
     with open(json_path) as f:
         data = json.load(f)
 
     books = data.get("books", [])
     if verbose:
-        print(f"Found {len(books)} books")
+        logger.info(f"Found [bold]{len(books)}[/bold] books")
 
     # Flatten books into chunks
     chunks = []
@@ -59,11 +62,11 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
                     )
 
     if verbose:
-        print(f"Extracted {len(chunks)} chunks from books")
+        logger.info(f"Extracted [bold]{len(chunks)}[/bold] chunks from books")
 
     # Create database
     if verbose:
-        print(f"Creating database at {db_path}...")
+        logger.info(f"Creating database at {db_path}...")
     create_database(db_path)
 
     # Connect and migrate
@@ -75,7 +78,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     authors_seen: dict[str, str] = {}  # name -> id mapping
 
     if verbose:
-        print("Migrating data...")
+        logger.info("Migrating data...")
 
     for i, chunk in enumerate(chunks):
         # Extract data from chunk
@@ -147,7 +150,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         )
 
         if verbose and (i + 1) % 500 == 0:
-            print(f"  Processed {i + 1}/{len(chunks)} chunks...")
+            logger.debug(f"  Processed {i + 1}/{len(chunks)} chunks...")
 
     conn.commit()
 
@@ -162,10 +165,10 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         cursor.execute("SELECT COUNT(*) FROM chunks")
         chunk_count = cursor.fetchone()[0]
 
-        print("\nMigration complete!")
-        print(f"  Books: {book_count}")
-        print(f"  Authors: {author_count}")
-        print(f"  Chunks: {chunk_count}")
+        logger.info("\n[green]✓[/green] Migration complete!")
+        logger.info(f"  Books: [bold]{book_count}[/bold]")
+        logger.info(f"  Authors: [bold]{author_count}[/bold]")
+        logger.info(f"  Chunks: [bold]{chunk_count}[/bold]")
 
     conn.close()
 
@@ -206,15 +209,17 @@ def verify_migration(db_path: str | Path, json_path: str | Path) -> bool:
 
     # Verify
     if json_chunk_count != db_chunk_count:
-        print(f"❌ Chunk count mismatch: JSON={json_chunk_count}, DB={db_chunk_count}")
+        logger.error(
+            f"[red]✗[/red] Chunk count mismatch: JSON={json_chunk_count}, DB={db_chunk_count}"
+        )
         return False
 
     # Check that faiss_index values are sequential
     if faiss_indices != list(range(len(faiss_indices))):
-        print("❌ FAISS indices are not sequential")
+        logger.error("[red]✗[/red] FAISS indices are not sequential")
         return False
 
-    print("✅ Migration verification passed")
+    logger.info("[green]✓[/green] Migration verification passed")
     return True
 
 
@@ -222,7 +227,7 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 3:
-        print("Usage: python migrate_to_db.py <index.json> <database.db>")
+        logger.error("Usage: python migrate_to_db.py <index.json> <database.db>")
         sys.exit(1)
 
     json_path = sys.argv[1]
