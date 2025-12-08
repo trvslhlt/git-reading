@@ -41,8 +41,8 @@ def main():
     readings_parser.add_argument(
         "--notes-dir",
         type=Path,
-        default=Path("."),
-        help="Directory containing markdown notes (default: current directory)",
+        required=True,
+        help="Directory containing markdown notes",
     )
     readings_parser.add_argument(
         "--git-dir",

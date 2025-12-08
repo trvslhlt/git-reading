@@ -151,7 +151,7 @@ def main():
     validate_parser.add_argument(
         "--notes-dir",
         type=str,
-        default=".",
+        required=True,
         help="Directory containing markdown notes",
     )
     validate_parser.add_argument("--patterns", type=str, help="Path to learned patterns JSON file")
@@ -182,7 +182,7 @@ def main():
     # Learn command
     learn_parser = subparsers.add_parser("learn", help="Learn patterns from markdown files")
     learn_parser.add_argument(
-        "--notes-dir", type=str, default=".", help="Directory containing markdown notes"
+        "--notes-dir", type=str, required=True, help="Directory containing markdown notes"
     )
     learn_parser.add_argument(
         "--output",
@@ -205,7 +205,7 @@ def main():
     fix_parser.add_argument(
         "--notes-dir",
         type=str,
-        default=".",
+        required=True,
         help="Directory containing markdown notes (default: current directory)",
     )
     fix_parser.add_argument(

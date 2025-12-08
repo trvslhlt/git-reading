@@ -122,13 +122,13 @@ def main():
     build_parser.add_argument(
         "--index",
         "-i",
-        default=".tmp/index.json",
+        required=True,
         help="Path to JSON index file (default: .tmp/index.json)",
     )
     build_parser.add_argument(
         "--output",
         "-o",
-        default=".tmp/vector_store",
+        required=True,
         help="Output directory for vector store (default: .tmp/vector_store)",
     )
     build_parser.add_argument(
