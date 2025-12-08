@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .models import Issue, ValidationResult
 from .rules.citation_rules import CitationValidator
+from .rules.content_rules import ContentValidator
 from .rules.header_rules import HeaderValidator
 from .rules.list_rules import ListItemValidator
 from .rules.section_rules import SectionNameValidator
@@ -25,6 +26,7 @@ class MarkdownValidator:
             SectionNameValidator(),
             CitationValidator(),
             ListItemValidator(),
+            ContentValidator(),
         ]
 
         # Pattern-based validator (optional)

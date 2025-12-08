@@ -113,9 +113,16 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
     def save_current_section():
         """Save the current section to the current book."""
         nonlocal current_section, current_section_items
-        if current_book and current_section and current_section_items:
-            section_key = current_section.lower().strip()
-            current_book["sections"][section_key] = current_section_items
+        if current_book and current_section:
+            if current_section_items:
+                section_key = current_section.lower().strip()
+                current_book["sections"][section_key] = current_section_items
+            else:
+                # Log error for empty section
+                logger.error(
+                    f"[red]✗[/red] Empty section in {filepath.name}: "
+                    f'"{current_book["title"]}" > "{current_section}"'
+                )
         current_section = None
         current_section_items = []
 
@@ -124,6 +131,12 @@ def parse_markdown_file(filepath: Path, repo_root: Path | None) -> list[dict]:
         nonlocal current_book
         save_current_section()
         if current_book:
+            # Check if book has any sections
+            if not current_book["sections"]:
+                logger.error(
+                    f"[red]✗[/red] Book with no sections in {filepath.name}: "
+                    f'"{current_book["title"]}"'
+                )
             books.append(current_book)
         current_book = None
 
