@@ -1,7 +1,7 @@
 # Git Reading - Makefile
 # Index and query reading notes from markdown files using git history
 
-.PHONY: help install test lint format clean \
+.PHONY: help install test test-cov test-cov-report lint format clean \
 	run-extract run-migrate run-validate run-fix run-learn-patterns \
 	run-search-build run-search-query run-search-stats run-streamlit \
 	dev-install streamlit-install search-install \
@@ -27,6 +27,8 @@ help:
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  make test                - Run all tests with pytest"
+	@echo "  make test-cov            - Run tests with coverage report"
+	@echo "  make test-cov-report     - Generate and open HTML coverage report"
 	@echo "  make lint                - Check code with ruff linter"
 	@echo "  make format              - Format code with ruff"
 	@echo "  make clean               - Remove build artifacts and caches"
@@ -112,6 +114,25 @@ test:
 	uv pip install .
 	uv run pytest -v
 
+test-cov:
+	@echo "Running tests with coverage..."
+	uv pip install .
+	uv run pytest --cov --cov-report=term-missing --cov-report=html
+
+test-cov-report:
+	@echo "Opening coverage report..."
+	@if [ ! -d "htmlcov" ]; then \
+		echo "Coverage report not found. Run 'make test-cov' first."; \
+		exit 1; \
+	fi
+	@if command -v open > /dev/null; then \
+		open htmlcov/index.html; \
+	elif command -v xdg-open > /dev/null; then \
+		xdg-open htmlcov/index.html; \
+	else \
+		echo "Coverage report generated at htmlcov/index.html"; \
+	fi
+
 lint:
 	@echo "Running linter..."
 	uv run ruff check .
@@ -128,6 +149,8 @@ clean:
 	rm -rf *.egg-info
 	rm -rf .pytest_cache
 	rm -rf .ruff_cache
+	rm -rf htmlcov/
+	rm -rf .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 

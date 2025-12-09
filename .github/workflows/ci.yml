@@ -56,9 +56,18 @@ jobs:
           uv sync --extra dev --extra test
           uv pip install .
 
-      - name: Run pytest
+      - name: Run pytest with coverage
         run: |
-          uv run pytest -v
+          uv run pytest --cov --cov-report=term --cov-report=xml
+
+      - name: Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v4
+        if: true  # Set to true to enable Codecov uploads
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 
   # Optional: Check that the package builds correctly
   build:
