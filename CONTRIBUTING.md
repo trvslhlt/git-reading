@@ -116,11 +116,7 @@ git push origin feature/your-feature-name
 
 ## Architecture
 
-The codebase follows an ETL pattern:
-- `extract/` - Parse markdown files and extract structured data
-- `normalize_source/` - Validate and normalize source data
-- `query/` - Semantic search and querying
-- `enrich/`, `transform/`, `load/` - Future pipeline stages (stubs)
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a comprehensive overview of the system architecture, including validation-first workflow, data flow diagrams, and component responsibilities.
 
 ## CI/CD
 
