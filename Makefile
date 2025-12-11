@@ -49,8 +49,8 @@ help:
 	@echo "  make run-streamlit       - Launch Streamlit app (requires: make streamlit-install)"
 	@echo ""
 	@echo "Common Workflows:"
-	@echo "  # Extract notes and build search index"
-	@echo "  make run-extract ARGS='--notes-dir readings --output book_index.json'"
+	@echo "  # Extract notes (incremental) and build search index"
+	@echo "  make run-extract ARGS='--notes-dir readings --index-dir index'"
 	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
 	@echo ""
@@ -158,17 +158,19 @@ clean:
 # Data Pipeline
 #
 
-# Extract reading notes from markdown files into JSON index
+# Extract reading notes from markdown files (incremental by default)
 # REQUIRES ARGS to prevent accidental file operations
 # CLI requires: --notes-dir (required at CLI level)
-# Usage: make run-extract ARGS='--notes-dir readings --output book_index.json'
+# Usage: make run-extract ARGS='--notes-dir readings --index-dir index'
+#        make run-extract ARGS='--notes-dir readings --index-dir index --full'
 #        make run-extract ARGS='--help'
 run-extract:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
 		echo "Usage:"; \
-		echo "  make run-extract ARGS='--notes-dir readings --output book_index.json'"; \
+		echo "  make run-extract ARGS='--notes-dir readings --index-dir index'"; \
+		echo "  make run-extract ARGS='--notes-dir readings --index-dir index --full'"; \
 		echo "  make run-extract ARGS='--help'"; \
 		exit 1; \
 	fi

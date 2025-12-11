@@ -4,11 +4,11 @@
 import argparse
 from pathlib import Path
 
-from .main import index_notes
+from .main import extract_full, extract_incremental
 
 
 def cmd_readings(args):
-    """Extract and index reading notes.
+    """Extract and index reading notes using incremental extraction.
 
     Args:
         args: Parsed command-line arguments
@@ -24,8 +24,24 @@ def cmd_readings(args):
         print(f"Error: {args.git_dir} is not a directory")
         return 1
 
-    index_notes(args.notes_dir, args.output, args.git_dir)
-    return 0
+    try:
+        if args.full:
+            # Force full re-extraction
+            extract_full(args.notes_dir, args.index_dir, args.git_dir)
+        else:
+            # Incremental extraction (default)
+            result = extract_incremental(args.notes_dir, args.index_dir, args.git_dir)
+            if result is None:
+                # No changes detected, but still return success
+                pass
+
+        return 0
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return 1
 
 
 def main():
@@ -51,10 +67,15 @@ def main():
         help="Git repository directory (default: auto-detect from notes-dir)",
     )
     readings_parser.add_argument(
-        "--output",
+        "--index-dir",
         type=Path,
-        default=Path("book_index.json"),
-        help="Output JSON file path (default: book_index.json)",
+        default=Path("./index"),
+        help="Directory to write extraction files (default: ./index)",
+    )
+    readings_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Force full re-extraction (default: incremental)",
     )
     readings_parser.set_defaults(func=cmd_readings)
 
