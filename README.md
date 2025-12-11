@@ -24,14 +24,19 @@ make install
 ### Quick Start
 
 ```bash
-# Extract reading notes
-make run-extract ARGS='--notes-dir /path/to/notes --output book_index.json'
+# Extract reading notes (incremental by default)
+make run-extract ARGS='--notes-dir /path/to/notes'
+
+# Force full re-extraction
+make run-extract ARGS='--notes-dir /path/to/notes --full'
 
 # For all available commands
 make help
 ```
 
 Run any command with `ARGS='--help'` for detailed options.
+
+**Note**: As of v2.0, extraction uses an incremental approach with an append-only log in `./index/` directory. See [Breaking Changes](#breaking-changes) below.
 
 ### Semantic Search
 
@@ -70,29 +75,89 @@ Files should be named `lastname__firstname.md` (double underscore). Each file ca
 
 Common sections: notes, excerpts, threads, terms, ideas.
 
-### Output Format
+### Incremental Extraction
 
-The generated JSON includes:
+The extraction system now uses an **incremental approach** that only processes changed files:
+
+- **First run**: Full extraction of all notes
+- **Subsequent runs**: Only extract changes since last run
+- **Output**: Append-only log in `./index/` directory
+- **Performance**: O(m) where m = changed files (vs O(n) for all files)
+
+Each extraction creates a new file tracking add/update/delete operations:
+
+```
+index/
+├── extraction_20251201_143022_abc123.json  # Full extraction
+├── extraction_20251201_150500_def456.json  # Incremental update
+└── extraction_20251201_152000_ghi789.json  # Incremental update
+```
+
+### Extraction File Format
+
+Each extraction file contains:
 
 ```json
 {
-  "generated_at": "2025-12-01T...",
-  "notes_directory": "/path/to/notes",
-  "total_books": 42,
-  "books": [
+  "extraction_metadata": {
+    "timestamp": "2025-12-01T15:20:00Z",
+    "git_commit_hash": "abc123...",
+    "extraction_type": "full|incremental",
+    "previous_commit_hash": "def456..."
+  },
+  "items": [
     {
-      "title": "Book Title",
-      "author": "Firstname Lastname",
-      "date_read": "2024-03-15",
-      "source_file": "lastname_firstname.md",
-      "sections": {
-        "notes": ["note 1", "note 2"],
-        "excerpts": ["quote 1"]
-      }
+      "item_id": "sha256:...",
+      "operation": "add|update|delete",
+      "book_title": "Book Title",
+      "author_first_name": "Firstname",
+      "author_last_name": "Lastname",
+      "section": "notes",
+      "content": "Note content",
+      "source_file": "lastname__firstname.md",
+      "date_read": "2024-03-15"
     }
   ]
 }
 ```
+
+### Breaking Changes (v2.0)
+
+**Incremental extraction introduces breaking changes:**
+
+#### CLI Changes
+- **Removed**: `--output book_index.json` option
+- **New**: `--index-dir ./index` (default directory for extraction files)
+- **New**: `--full` flag to force full re-extraction
+- **Default**: Incremental extraction (not full)
+
+#### Old Commands (v1.x)
+```bash
+extract readings --notes-dir ./notes --output book_index.json
+```
+
+#### New Commands (v2.0+)
+```bash
+# Incremental extraction (default)
+extract readings --notes-dir ./notes
+
+# Full re-extraction
+extract readings --notes-dir ./notes --full
+
+# Custom index directory
+extract readings --notes-dir ./notes --index-dir ./custom_index
+```
+
+#### Output Format Changes
+- **Old**: Single `book_index.json` file (book-centric)
+- **New**: Multiple extraction files in `index/` directory (item-centric, append-only log)
+
+#### Migration Steps
+1. Run full extraction: `extract readings --notes-dir ./notes --full`
+2. **Important**: Downstream consumers (search, load) need updates to read from `index/` directory
+3. Delete old `book_index.json` file
+
+See [docs/INCREMENTAL_EXTRACTION_PLAN.md](docs/INCREMENTAL_EXTRACTION_PLAN.md) for detailed architecture.
 
 ---
 
@@ -132,8 +197,17 @@ Tool configuration lives in `pyproject.toml`:
 
 ### How It Works
 
-1. Scans markdown files for book titles (`#` headers) and sections (`##` headers)
-2. Uses `git blame` to determine when each book was added
-3. Outputs a JSON index sorted by reading date
+The extraction system uses git as the source of truth for change detection:
+
+1. **First run**: Parses all markdown files, extracts items, marks all as "add"
+2. **Subsequent runs**:
+   - Runs `git diff` to find changed files since last extraction
+   - For added files: extract and mark all as "add"
+   - For modified files: extract current + previous (via `git show`), compare
+   - For deleted files: extract previous (via `git show`), mark all as "delete"
+3. **Item IDs**: Each item gets a deterministic SHA256 ID based on book + author + section + content
+4. **Output**: Append-only extraction files with operation types (add/update/delete)
 
 The `--git-dir` parameter allows separation of git repository and notes directory.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system architecture and [docs/INCREMENTAL_EXTRACTION_PLAN.md](docs/INCREMENTAL_EXTRACTION_PLAN.md) for detailed design.

@@ -52,10 +52,14 @@ git checkout -b feature/your-feature-name
 ### 2. Make Changes
 
 Follow the project structure:
-- `src/extract/` - Data extraction from markdown
+- `src/extract/` - Data extraction from markdown (incremental, item-centric)
+  - `models.py` - Data structures for extraction files
+  - `item_id.py` - SHA256-based item ID generation
+  - `git_utils.py` - Git operations for change detection
+  - `change_detection.py` - Detect add/update/delete operations
 - `src/normalize_source/` - Validation and normalization
 - `src/query/` - Search and query functionality
-- `tests/` - Test files
+- `tests/` - Test files (see `tests/extract/test_incremental_extraction.py` for examples)
 
 ### 3. Run Checks
 

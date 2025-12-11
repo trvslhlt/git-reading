@@ -14,6 +14,13 @@ from pathlib import Path
 from common.constants import CANONICAL_SECTIONS
 from common.logger import get_logger
 
+from .change_detection import detect_operations_for_file
+from .extraction_io import read_previous_commit_hash, write_extraction_file
+from .file_utils import generate_extraction_filename
+from .git_utils import get_commit_timestamp, get_current_commit_hash, git_diff_files
+from .item_extraction import extract_items_from_books
+from .models import ExtractionMetadata
+
 logger = get_logger(__name__)
 
 
@@ -253,3 +260,208 @@ def index_notes(notes_dir: Path, output_path: Path, git_dir: Path | None = None)
     logger.info(
         f"[green]✓[/green] Wrote index with [bold]{len(all_books)}[/bold] books to {output_path}"
     )
+
+
+def extract_full(
+    notes_dir: Path,
+    index_dir: Path,
+    git_dir: Path | None,
+) -> Path:
+    """
+    Perform full extraction of all markdown files.
+
+    1. Parse all .md files in notes_dir
+    2. Convert to items
+    3. Mark all as operation="add"
+    4. Get current git commit info
+    5. Write extraction file to index_dir
+
+    Args:
+        notes_dir: Directory containing markdown notes
+        index_dir: Directory to write extraction files
+        git_dir: Git repository directory (if None, will search from notes_dir)
+
+    Returns:
+        Path to created extraction file
+
+    Raises:
+        ValueError: If git repository not found or index directory not empty
+    """
+    notes_dir = notes_dir.resolve()
+
+    # Check if index directory has existing extraction files
+    if index_dir.exists():
+        existing_files = list(index_dir.glob("extraction_*.json"))
+        if existing_files:
+            raise ValueError(
+                f"Index directory '{index_dir}' already contains {len(existing_files)} extraction file(s). "
+                "Full extraction requires an empty index directory to avoid overwriting history. "
+                "Either delete the existing files or use a different directory."
+            )
+
+    # Determine git repository root
+    if git_dir:
+        repo_root = git_dir.resolve()
+    else:
+        repo_root = find_git_root(notes_dir)
+
+    if not repo_root or not (repo_root / ".git").exists():
+        raise ValueError("Git repository required for extraction")
+
+    # Get current commit info
+    current_commit = get_current_commit_hash(repo_root)
+    commit_timestamp = get_commit_timestamp(repo_root, current_commit)
+
+    logger.info(f"Performing full extraction at commit {current_commit[:7]}")
+
+    # Find all markdown files
+    md_files = sorted(notes_dir.glob("*.md"))
+
+    if not md_files:
+        logger.warning(f"No markdown files found in {notes_dir}")
+        return None
+
+    logger.info(f"Found [bold]{len(md_files)}[/bold] markdown file(s)")
+
+    # Extract all items
+    all_items = []
+    for md_file in md_files:
+        logger.debug(f"Parsing {md_file.name}...")
+        books = parse_markdown_file(md_file, repo_root)
+        items = extract_items_from_books(books, md_file.name, operation="add")
+        all_items.extend(items)
+        logger.debug(f"  Found {len(items)} item(s)")
+
+    # Create extraction metadata
+    metadata = ExtractionMetadata(
+        timestamp=datetime.now().isoformat(),
+        git_commit_hash=current_commit,
+        git_commit_timestamp=commit_timestamp,
+        extraction_type="full",
+        previous_commit_hash=None,
+        notes_directory=str(notes_dir),
+    )
+
+    # Generate filename and write
+    filename = generate_extraction_filename(datetime.now(), current_commit)
+    output_path = index_dir / filename
+
+    write_extraction_file(output_path, metadata, all_items)
+
+    logger.info(
+        f"[green]✓[/green] Wrote full extraction with [bold]{len(all_items)}[/bold] items to {output_path.name}"
+    )
+
+    return output_path
+
+
+def extract_incremental(
+    notes_dir: Path,
+    index_dir: Path,
+    git_dir: Path | None,
+) -> Path | None:
+    """
+    Perform incremental extraction using git as source of truth.
+
+    1. Find latest extraction file in index_dir
+    2. Load previous commit hash from that file
+    3. Get current commit hash
+    4. Run git diff --name-status to find changed files (A/M/D)
+    5. If no changes, return early (no new extraction file)
+    6. For each changed file:
+       - If added ("A"): extract current, mark all as "add"
+       - If modified ("M"): extract current + previous (git show), compare
+       - If deleted ("D"): extract previous (git show), mark all as "delete"
+    7. Collect all operations from all files
+    8. Write new extraction file
+
+    Args:
+        notes_dir: Directory containing markdown notes
+        index_dir: Directory containing extraction files
+        git_dir: Git repository directory (if None, will search from notes_dir)
+
+    Returns:
+        Path to created extraction file, or None if no changes
+
+    Raises:
+        ValueError: If git repository not found or no previous extraction exists
+    """
+    notes_dir = notes_dir.resolve()
+
+    # Determine git repository root
+    if git_dir:
+        repo_root = git_dir.resolve()
+    else:
+        repo_root = find_git_root(notes_dir)
+
+    if not repo_root or not (repo_root / ".git").exists():
+        raise ValueError("Git repository required for extraction")
+
+    # Find previous extraction
+    previous_commit = read_previous_commit_hash(index_dir)
+
+    if previous_commit is None:
+        logger.info("No previous extraction found, performing full extraction")
+        return extract_full(notes_dir, index_dir, git_dir)
+
+    # Get current commit
+    current_commit = get_current_commit_hash(repo_root)
+    commit_timestamp = get_commit_timestamp(repo_root, current_commit)
+
+    logger.info(f"Incremental extraction: {previous_commit[:7]} → {current_commit[:7]}")
+
+    # Find changed files
+    changed_files = git_diff_files(repo_root, previous_commit, current_commit, "*.md")
+
+    if not changed_files:
+        logger.info("[green]✓[/green] No changes detected, skipping extraction")
+        return None
+
+    logger.info(f"Found {len(changed_files)} changed file(s)")
+
+    # Process each changed file
+    all_items = []
+    for file_change in changed_files:
+        # Get relative path for logging
+        try:
+            rel_path = file_change.path.relative_to(notes_dir)
+            log_path = str(rel_path)
+        except ValueError:
+            log_path = file_change.path.name
+
+        logger.debug(f"Processing {file_change.status}: {log_path}")
+
+        items = detect_operations_for_file(
+            repo_root, file_change, previous_commit, parse_markdown_file
+        )
+        all_items.extend(items)
+
+        logger.debug(f"  {len(items)} operation(s)")
+
+    # Create extraction metadata
+    metadata = ExtractionMetadata(
+        timestamp=datetime.now().isoformat(),
+        git_commit_hash=current_commit,
+        git_commit_timestamp=commit_timestamp,
+        extraction_type="incremental",
+        previous_commit_hash=previous_commit,
+        notes_directory=str(notes_dir),
+    )
+
+    # Generate filename and write
+    filename = generate_extraction_filename(datetime.now(), current_commit)
+    output_path = index_dir / filename
+
+    write_extraction_file(output_path, metadata, all_items)
+
+    # Log summary by operation type
+    adds = sum(1 for item in all_items if item.operation == "add")
+    updates = sum(1 for item in all_items if item.operation == "update")
+    deletes = sum(1 for item in all_items if item.operation == "delete")
+
+    logger.info(
+        f"[green]✓[/green] Wrote incremental extraction to {output_path.name}: "
+        f"{adds} adds, {updates} updates, {deletes} deletes"
+    )
+
+    return output_path
