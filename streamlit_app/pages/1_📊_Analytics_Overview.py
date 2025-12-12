@@ -24,8 +24,13 @@ def get_author_name(book: dict) -> str:
     return last_name or first_name or "Unknown"
 
 
+@st.cache_data
 def load_from_extractions(index_dir: Path) -> dict:
-    """Load books from extraction files."""
+    """Load books from extraction files.
+
+    Cached to avoid replaying extractions on every page interaction.
+    Cache is invalidated when index_dir changes.
+    """
     if not index_dir.exists():
         return {"books": [], "total_books": 0}
 
@@ -248,7 +253,7 @@ def main():
 
             st.dataframe(
                 timeline_data,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:

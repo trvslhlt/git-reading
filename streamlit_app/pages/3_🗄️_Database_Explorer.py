@@ -93,7 +93,7 @@ def main():
                     schema,
                     columns=["Column ID", "Name", "Type", "NotNull", "Default", "PrimaryKey"],
                 )
-                st.dataframe(schema_df, use_container_width=True, hide_index=True)
+                st.dataframe(schema_df, width="stretch", hide_index=True)
 
             # Get row count
             row_count = get_table_count(conn, selected_table)
@@ -133,7 +133,7 @@ def main():
                 if results:
                     # Convert to DataFrame for nice display
                     df = pd.DataFrame(results, columns=columns)
-                    st.dataframe(df, use_container_width=True, height=400)
+                    st.dataframe(df, width="stretch", height=400)
 
                     # Download button
                     csv = df.to_csv(index=False)
@@ -235,7 +235,7 @@ AND n.excerpt LIKE '%meaning%';
 
                         # Display results
                         df = pd.DataFrame(results, columns=columns)
-                        st.dataframe(df, use_container_width=True, height=400)
+                        st.dataframe(df, width="stretch", height=400)
 
                         # Download results
                         csv = df.to_csv(index=False)
@@ -264,7 +264,7 @@ AND n.excerpt LIKE '%meaning%';
             stats_data.append({"Table": table, "Rows": count})
 
         stats_df = pd.DataFrame(stats_data)
-        st.dataframe(stats_df, use_container_width=True, hide_index=True)
+        st.dataframe(stats_df, width="stretch", hide_index=True)
 
         # Quick insights
         st.subheader("Quick Insights")
@@ -321,7 +321,7 @@ AND n.excerpt LIKE '%meaning%';
             """
             columns, results = execute_query(conn, query)
             df = pd.DataFrame(results, columns=columns)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width="stretch", hide_index=True)
         except Exception as e:
             st.error(f"Failed to load top books: {e}")
 

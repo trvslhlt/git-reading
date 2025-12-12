@@ -101,7 +101,7 @@ def main():
     filter_section = None if filter_section == "All Sections" else filter_section
 
     # Search button
-    if st.button("🔍 Search", type="primary", use_container_width=True) or query:
+    if st.button("🔍 Search", type="primary", width="stretch") or query:
         if not query:
             st.warning("Please enter a search query")
             return
