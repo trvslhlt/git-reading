@@ -14,9 +14,9 @@ Semantic search allows you to find related content in your reading notes based o
 
 ```
 ┌─────────────────┐
-│  index.json     │  (from extract module)
-│  (structured    │
-│   reading data) │
+│ Extraction Files│  (from extract module)
+│ (incremental    │
+│  operations)    │
 └────────┬────────┘
          │
          ▼
@@ -29,7 +29,7 @@ Semantic search allows you to find related content in your reading notes based o
 ┌─────────────────┐
 │  Vector Store   │  FAISS index
 │  (similarity    │  + metadata
-│   search)       │
+│   search)       │  + checkpoints
 └────────┬────────┘
          │
          ▼
@@ -62,10 +62,10 @@ Manages FAISS index and metadata with pre-filtering support:
 ```python
 store = VectorStore(dimension=384)
 store.add(embeddings, chunks)
-store.save(Path(".tmp/vector_store"))
+store.save(Path(VECTOR_STORE_DIR))
 
 # Later...
-store = VectorStore.load(Path(".tmp/vector_store"))
+store = VectorStore.load(Path(VECTOR_STORE_DIR))
 results = store.search(
     query_embedding,
     k=5,
@@ -86,17 +86,25 @@ results = store.search(
 High-level search functionality:
 
 ```python
-# Build index
-build_search_index(
-    index_path=Path(".tmp/index.json"),
-    output_dir=Path(".tmp/vector_store"),
-    sections_to_index=["notes", "excerpts"]
+from common.constants import INDEX_DIR, VECTOR_STORE_DIR
+
+# Build index from extraction files
+build_search_index_from_extractions(
+    index_dir=INDEX_DIR,
+    output_dir=VECTOR_STORE_DIR,
+    model_name="all-MiniLM-L6-v2"
+)
+
+# Incremental update
+update_search_index_incremental(
+    index_dir=INDEX_DIR,
+    vector_store_dir=VECTOR_STORE_DIR
 )
 
 # Search
 results = search_notes(
     query="meaning of life",
-    vector_store_dir=Path(".tmp/vector_store"),
+    vector_store_dir=VECTOR_STORE_DIR,
     k=5,
     filter_author="John Barth"
 )
@@ -118,20 +126,21 @@ Command-line interface with three commands:
 # 1. Install search dependencies (one-time)
 make search-install
 
-# 2. Build the search index
-make run-search-build
+# 2. Extract reading notes (creates extraction files in data/index/)
+make run-extract ARGS='--notes-dir readings'
 
-# 3. Search!
+# 3. Build the search index from extraction files
+make run-search-build ARGS='--index-dir data/index --output data/vector_store'
+
+# 4. Search!
 make run-search-query ARGS='"your search query"'
+
+# 5. For incremental updates (after adding new notes):
+make run-extract ARGS='--notes-dir readings'  # Incremental by default
+make run-search-build ARGS='--index-dir data/index --output data/vector_store --incremental'
 ```
 
 ### Advanced Usage
-
-**Custom sections:**
-```bash
-# Only index notes and excerpts
-PYTHONPATH=src uv run search build --sections "notes,excerpts"
-```
 
 **More results:**
 ```bash
@@ -157,14 +166,41 @@ make run-search-query ARGS='"time and memory" --format json'
 **Custom model:**
 ```bash
 # Use higher quality model (slower, better results)
-PYTHONPATH=src uv run search build --model all-mpnet-base-v2
+make run-search-build ARGS='--index-dir data/index --output data/vector_store --model all-mpnet-base-v2'
 ```
+
+## Incremental Updates
+
+The search index supports incremental updates, allowing you to add new notes without rebuilding the entire index:
+
+```bash
+# Initial build
+make run-search-build ARGS='--index-dir data/index --output data/vector_store'
+
+# After adding new notes, extract incrementally
+make run-extract ARGS='--notes-dir readings'
+
+# Update search index incrementally
+make run-search-build ARGS='--index-dir data/index --output data/vector_store --incremental'
+```
+
+**How it works:**
+1. Vector store tracks a checkpoint (git commit hash of last processed extraction)
+2. During incremental update, only new extraction files are processed
+3. Add/update/delete operations are applied to the existing index
+4. Checkpoint is updated after each extraction file
+
+**Benefits:**
+- Much faster than full rebuild (processes only new changes)
+- Maintains consistency with extraction files
+- Supports all CRUD operations (add, update, delete)
 
 ## Performance
 
 **Index Building:**
-- ~4,000 chunks: ~10-15 seconds
-- ~10,000 chunks: ~30-40 seconds
+- Full build (~4,000 notes): ~10-15 seconds
+- Full build (~10,000 notes): ~30-40 seconds
+- Incremental update (10-100 new notes): ~1-3 seconds
 - Includes building lookup tables (minimal overhead)
 
 **Search:**
@@ -180,14 +216,24 @@ PYTHONPATH=src uv run search build --model all-mpnet-base-v2
 
 ## Programmatic Usage
 
-See [examples/search_example.py](examples/search_example.py) for code examples:
+See [examples/search_example.py](../examples/search_example.py) for code examples:
 
 ```python
-from query.search import search_notes
+from pathlib import Path
+from common.constants import INDEX_DIR, VECTOR_STORE_DIR
+from query.search import build_search_index_from_extractions, search_notes
 
+# Build index from extraction files
+build_search_index_from_extractions(
+    index_dir=INDEX_DIR,
+    output_dir=VECTOR_STORE_DIR,
+    model_name="all-MiniLM-L6-v2"
+)
+
+# Search
 results = search_notes(
     query="existential philosophy",
-    vector_store_dir=Path(".tmp/vector_store"),
+    vector_store_dir=VECTOR_STORE_DIR,
     k=5
 )
 
@@ -273,7 +319,11 @@ Potential additions:
 - Solution: Run `make search-install`
 
 **Issue: "Vector store not found"**
-- Solution: Run `make run-search-build` first
+- Solution: Run extraction first, then build the search index:
+  ```bash
+  make run-extract ARGS='--notes-dir readings'
+  make run-search-build ARGS='--index-dir data/index --output data/vector_store'
+  ```
 
 **Issue: Search is slow**
 - Check: Are you using a large model? Try `all-MiniLM-L6-v2`

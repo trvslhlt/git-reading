@@ -20,7 +20,6 @@ def build_search_index(
     index_path: Path,
     output_dir: Path,
     model_name: str = "all-MiniLM-L6-v2",
-    sections_to_index: list[str] | None = None,
 ):
     """
     Build a vector search index from the reading notes JSON index.
@@ -29,8 +28,6 @@ def build_search_index(
         index_path: Path to the JSON index file (from extract)
         output_dir: Directory to save the vector store
         model_name: Name of the sentence transformer model to use
-        sections_to_index: List of section names to index (e.g., ["notes", "excerpts"])
-                          If None, indexes all sections
     """
     logger.info(f"Loading index from {index_path}")
     with open(index_path) as f:
@@ -56,10 +53,6 @@ def build_search_index(
         sections = book.get("sections", {})
 
         for section_name, items in sections.items():
-            # Filter by section if specified
-            if sections_to_index and section_name not in sections_to_index:
-                continue
-
             for item in items:
                 # Skip empty items
                 if not item or not item.strip():
@@ -101,7 +94,6 @@ def build_search_index(
         "model_name": model_name,
         "embedding_dimension": model.get_dimension(),
         "source_index": str(index_path),
-        "sections_indexed": sections_to_index or "all",
     }
     with open(output_dir / "model_info.json", "w") as f:
         json.dump(model_info, f, indent=2)
@@ -116,7 +108,6 @@ def build_search_index_from_extractions(
     index_dir: Path,
     output_dir: Path,
     model_name: str = "all-MiniLM-L6-v2",
-    sections_to_index: list[str] | None = None,
 ):
     """
     Build a vector search index from extraction files (full rebuild).
@@ -125,8 +116,6 @@ def build_search_index_from_extractions(
         index_dir: Directory containing extraction files
         output_dir: Directory to save the vector store
         model_name: Name of the sentence transformer model to use
-        sections_to_index: List of section names to index (e.g., ["notes", "excerpts"])
-                          If None, indexes all sections
     """
     logger.info(f"Loading extraction files from {index_dir}")
 
@@ -148,10 +137,6 @@ def build_search_index_from_extractions(
 
     logger.info("Extracting text notes...")
     for item in items:
-        # Filter by section if specified
-        if sections_to_index and item.section not in sections_to_index:
-            continue
-
         # Skip empty items
         if not item.content or not item.content.strip():
             continue
@@ -198,7 +183,6 @@ def build_search_index_from_extractions(
         "model_name": model_name,
         "embedding_dimension": model.get_dimension(),
         "source_index_dir": str(index_dir),
-        "sections_indexed": sections_to_index or "all",
     }
     with open(output_dir / "model_info.json", "w") as f:
         json.dump(model_info, f, indent=2)
@@ -212,7 +196,6 @@ def build_search_index_from_extractions(
 def update_search_index_incremental(
     index_dir: Path,
     vector_store_dir: Path,
-    sections_to_index: list[str] | None = None,
 ):
     """
     Apply incremental updates to an existing vector search index.
@@ -220,8 +203,6 @@ def update_search_index_incremental(
     Args:
         index_dir: Directory containing extraction files
         vector_store_dir: Directory containing the vector store
-        sections_to_index: List of section names to index (e.g., ["notes", "excerpts"])
-                          If None, indexes all sections
     """
     logger.info(f"Loading vector store from {vector_store_dir}")
 
@@ -262,10 +243,6 @@ def update_search_index_incremental(
         logger.debug(f"Processing extraction: {extraction.extraction_metadata.git_commit_hash[:7]}")
 
         for item in extraction.items:
-            # Filter by section if specified
-            if sections_to_index and item.section not in sections_to_index:
-                continue
-
             if item.operation == "add":
                 # Generate embedding and add to store
                 note = TextNote(

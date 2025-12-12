@@ -18,12 +18,6 @@ from query.vector_store import VectorStore
 
 def cmd_build(args):
     """Build the vector search index."""
-    # Parse sections if provided
-    sections = None
-    if args.sections:
-        sections = [s.strip().lower() for s in args.sections.split(",")]
-        print(f"Indexing sections: {', '.join(sections)}")
-
     output_dir = Path(args.output)
     index_dir = Path(args.index_dir)
 
@@ -42,7 +36,6 @@ def cmd_build(args):
         update_search_index_incremental(
             index_dir=index_dir,
             vector_store_dir=output_dir,
-            sections_to_index=sections,
         )
 
     else:
@@ -51,7 +44,6 @@ def cmd_build(args):
             index_dir=index_dir,
             output_dir=output_dir,
             model_name=args.model,
-            sections_to_index=sections,
         )
 
 
@@ -110,7 +102,6 @@ def cmd_stats(args):
         print(f"  Model: {model_info.get('model_name')}")
         print(f"  Dimension: {model_info.get('embedding_dimension')}")
         print(f"  Source index: {model_info.get('source_index')}")
-        print(f"  Sections: {model_info.get('sections_indexed')}")
         print()
 
     # Load vector store
@@ -162,11 +153,6 @@ def main():
         "-m",
         default="all-MiniLM-L6-v2",
         help="Sentence transformer model name (default: all-MiniLM-L6-v2)",
-    )
-    build_parser.add_argument(
-        "--sections",
-        "-s",
-        help="Comma-separated list of sections to index (e.g., 'notes,excerpts')",
     )
 
     # Search command
