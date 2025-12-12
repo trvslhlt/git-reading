@@ -1,45 +1,48 @@
-"""Database explorer page - browse and query the SQLite database."""
+"""Database explorer page - browse and query the database."""
 
-import sqlite3
+import sys
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-def get_table_names(conn: sqlite3.Connection) -> list[str]:
+from load.db import DatabaseAdapter
+from load.db_schema import get_connection
+
+
+def get_table_names(adapter: DatabaseAdapter) -> list[str]:
     """Get list of tables in the database."""
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-    return [row[0] for row in cursor.fetchall()]
+    return adapter.get_tables()
 
 
-def get_table_schema(conn: sqlite3.Connection, table_name: str) -> list[tuple]:
+def get_table_schema(adapter: DatabaseAdapter, table_name: str) -> list[dict]:
     """Get schema information for a table."""
-    cursor = conn.cursor()
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    return cursor.fetchall()
+    return adapter.get_table_schema(table_name)
 
 
-def get_table_count(conn: sqlite3.Connection, table_name: str) -> int:
+def get_table_count(adapter: DatabaseAdapter, table_name: str) -> int:
     """Get row count for a table."""
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-    return cursor.fetchone()[0]
+    result = adapter.fetchone(f"SELECT COUNT(*) FROM {table_name}")
+    return result[list(result.keys())[0]]
 
 
-def execute_query(conn: sqlite3.Connection, query: str) -> tuple[list, list]:
+def execute_query(adapter: DatabaseAdapter, query: str) -> tuple[list, list]:
     """Execute a SQL query and return results."""
-    cursor = conn.cursor()
-    cursor.execute(query)
+    cursor = adapter.execute(query)
     results = cursor.fetchall()
+
+    # Get column names from cursor description
     columns = [desc[0] for desc in cursor.description] if cursor.description else []
+
     return columns, results
 
 
 def main():
     st.title("🗄️ Database Explorer")
-    st.markdown("*Browse and query the SQLite reading notes database*")
+    st.markdown("*Browse and query the reading notes database*")
 
     # Check if database exists
     db_path = Path("./data/readings.db")
@@ -50,7 +53,7 @@ def main():
         )
         st.info(
             "💡 **What is the database?**\n\n"
-            "The SQLite database stores all your reading notes in a structured format "
+            "The database stores all your reading notes in a structured format "
             "that's easier to query and extend than a single JSON file. "
             "It includes tables for books, authors, excerpts, and their relationships."
         )
@@ -58,18 +61,17 @@ def main():
 
     # Connect to database
     try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
+        adapter = get_connection(db_path)
     except Exception as e:
         st.error(f"Failed to connect to database: {e}")
         return
 
     # Get list of tables
-    tables = get_table_names(conn)
+    tables = get_table_names(adapter)
 
     if not tables:
         st.warning("No tables found in database")
-        conn.close()
+        adapter.close()
         return
 
     # Tabs for different views
@@ -88,15 +90,24 @@ def main():
         if selected_table:
             # Show schema
             with st.expander("📐 Table Schema", expanded=False):
-                schema = get_table_schema(conn, selected_table)
-                schema_df = pd.DataFrame(
-                    schema,
-                    columns=["Column ID", "Name", "Type", "NotNull", "Default", "PrimaryKey"],
+                schema = get_table_schema(adapter, selected_table)
+                # Schema is already a list of dicts, convert to DataFrame
+                schema_df = pd.DataFrame(schema)
+                # Rename columns for display
+                schema_df = schema_df.rename(
+                    columns={
+                        "cid": "Column ID",
+                        "name": "Name",
+                        "type": "Type",
+                        "notnull": "NotNull",
+                        "default": "Default",
+                        "pk": "PrimaryKey",
+                    }
                 )
                 st.dataframe(schema_df, width="stretch", hide_index=True)
 
             # Get row count
-            row_count = get_table_count(conn, selected_table)
+            row_count = get_table_count(adapter, selected_table)
             st.metric("Total Rows", row_count)
 
             # Pagination controls
@@ -128,7 +139,7 @@ def main():
             query = f"SELECT * FROM {selected_table} LIMIT {rows_per_page} OFFSET {offset}"
 
             try:
-                columns, results = execute_query(conn, query)
+                columns, results = execute_query(adapter, query)
 
                 if results:
                     # Convert to DataFrame for nice display
@@ -228,7 +239,7 @@ AND n.excerpt LIKE '%meaning%';
 
             try:
                 with st.spinner("Executing query..."):
-                    columns, results = execute_query(conn, sql_query)
+                    columns, results = execute_query(adapter, sql_query)
 
                     if results:
                         st.success(f"Query returned {len(results)} rows")
@@ -260,7 +271,7 @@ AND n.excerpt LIKE '%meaning%';
 
         stats_data = []
         for table in tables:
-            count = get_table_count(conn, table)
+            count = get_table_count(adapter, table)
             stats_data.append({"Table": table, "Rows": count})
 
         stats_df = pd.DataFrame(stats_data)
@@ -283,7 +294,7 @@ AND n.excerpt LIKE '%meaning%';
                     ORDER BY book_count DESC
                     LIMIT 10
                 """
-                columns, results = execute_query(conn, query)
+                columns, results = execute_query(adapter, query)
                 df = pd.DataFrame(results, columns=columns)
                 st.bar_chart(df.set_index("name"))
             except Exception as e:
@@ -299,7 +310,7 @@ AND n.excerpt LIKE '%meaning%';
                     GROUP BY section
                     ORDER BY count DESC
                 """
-                columns, results = execute_query(conn, query)
+                columns, results = execute_query(adapter, query)
                 df = pd.DataFrame(results, columns=columns)
                 st.bar_chart(df.set_index("section"))
             except Exception as e:
@@ -319,14 +330,14 @@ AND n.excerpt LIKE '%meaning%';
                 ORDER BY excerpt_count DESC
                 LIMIT 10
             """
-            columns, results = execute_query(conn, query)
+            columns, results = execute_query(adapter, query)
             df = pd.DataFrame(results, columns=columns)
             st.dataframe(df, width="stretch", hide_index=True)
         except Exception as e:
             st.error(f"Failed to load top books: {e}")
 
     # Close connection
-    conn.close()
+    adapter.close()
 
 
 if __name__ == "__main__":
