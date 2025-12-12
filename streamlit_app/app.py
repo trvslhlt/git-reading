@@ -140,9 +140,9 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
    ```
    This creates extraction files in `./data/index/` from your markdown files.
 
-2. **Migrate to database** (optional, for Database Explorer)
+2. **Load to database** (optional, for Database Explorer)
    ```bash
-   load-db migrate --index-dir <path> --database <path>
+   load-db load --index-dir <path> --database <path>
    ```
    This creates a SQLite database from the extraction files.
 
@@ -158,7 +158,7 @@ Whenever you add new reading notes:
 
 ```bash
 extract readings --notes-dir <path>              # Re-extract from markdown (incremental)
-load-db migrate --index-dir <path> --database <path> --incremental  # Update database
+load-db load --index-dir <path> --database <path> --incremental  # Update database
 search build --index-dir <path> --output <path> --incremental       # Update search index
 ```
 
@@ -188,7 +188,7 @@ with col2:
         st.success("✅ Database found")
     else:
         st.warning("⚠️ Database not found")
-        st.caption("Run `load-db migrate --index-dir <path> --database <path>`")
+        st.caption("Run `load-db load --index-dir <path> --database <path>`")
 
 with col3:
     vector_exists = Path(VECTOR_STORE_DIR).exists()

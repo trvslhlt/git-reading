@@ -23,7 +23,7 @@ Use for **important user-facing progress updates**.
 **Examples:**
 - "Found 10 markdown files"
 - "✓ Wrote index with 49 books"
-- "Starting migration..."
+- "Starting data load..."
 
 **When NOT to use:**
 - File-by-file processing details (use DEBUG)
@@ -48,7 +48,7 @@ Use for **recoverable issues or deprecated features**.
 **Examples:**
 - "No git repository found, dates will be unavailable"
 - "File not found, skipping..."
-- "Using deprecated format, please migrate"
+- "Using deprecated format, please update"
 
 **When to use:**
 - Something unexpected but not fatal
@@ -74,7 +74,7 @@ You can use rich markup for beautiful output:
 
 ```python
 logger.info(f"Found [bold]{count}[/bold] files")
-logger.info("[green]✓[/green] Migration complete")
+logger.info("[green]✓[/green] Load complete")
 logger.warning("[yellow]⚠[/yellow] Deprecated feature")
 logger.error("[red]✗[/red] Operation failed")
 ```
@@ -187,7 +187,7 @@ def process_files(files):
 
 ## Examples from the Codebase
 
-See [src/extract/main.py](../src/extract/main.py) for a real-world example of migrated code.
+See [src/extract/main.py](../src/extract/main.py) for a real-world example of converted code.
 
 **Key patterns:**
 - User-facing counts use `logger.info()` with bold markup

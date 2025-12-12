@@ -1,8 +1,8 @@
-# Database Migration Guide
+# Database Loading Guide
 
-This guide explains how to migrate from the JSON-based index to SQLite database storage.
+This guide explains how to load data from extraction files into SQLite database storage.
 
-## Why Migrate?
+## Why Use a Database?
 
 The SQLite database provides several advantages over the single JSON file:
 
@@ -34,27 +34,27 @@ The database includes the following tables:
 - Hierarchical genre taxonomy (parent_id)
 - Ready for enrichment with external metadata
 
-## Migration Process
+## Loading Process
 
-### Step 1: Run the Migration
+### Step 1: Load the Data
 
 ```bash
-# Migrate with defaults (.tmp/index.json → .tmp/readings.db)
-make run-migrate
-
-# Or specify custom paths
-make run-migrate ARGS='--index /path/to/index.json --database /path/to/output.db'
+# Load with default paths
+make run-load ARGS='--index-dir data/index --database data/readings.db'
 
 # Force overwrite existing database
-make run-migrate ARGS='--force'
+make run-load ARGS='--index-dir data/index --database data/readings.db --force'
+
+# Incremental update
+make run-load ARGS='--index-dir data/index --database data/readings.db --incremental'
 ```
 
-### Step 2: Verify Migration
+### Step 2: Verify Load
 
-The migration automatically verifies:
-- All chunks were migrated
+The loading process automatically verifies:
+- All notes were loaded
 - FAISS indices are sequential (0, 1, 2, ...)
-- Chunk counts match between JSON and database
+- Note counts match between sources and database
 
 Output:
 ```
@@ -62,17 +62,17 @@ Loading data from .tmp/index.json...
 Found 201 books
 Extracted 4174 chunks from books
 Creating database at .tmp/readings.db...
-Migrating data...
+Loading data...
   Processed 500/4174 chunks...
   ...
-Migration complete!
+Load complete!
   Books: 199
   Authors: 126
   Chunks: 4174
-✅ Migration verification passed
+✅ Load verification passed
 ```
 
-## What Gets Migrated?
+## What Gets Loaded?
 
 ### From JSON Structure
 
@@ -190,7 +190,7 @@ This allows the database-backed vector store ([src/query/vector_store_db.py](../
 
 ## Next Steps
 
-After migration, you can:
+After loading, you can:
 
 1. **Enrich the Data**: Add metadata from external APIs
    - ISBNs, publication years, ratings from Open Library
@@ -211,7 +211,7 @@ After migration, you can:
 
 ## Troubleshooting
 
-### Migration fails: "Index file not found"
+### Load fails: "Index directory not found"
 
 Make sure you've extracted readings first:
 ```bash
@@ -222,7 +222,7 @@ make run-extract
 
 Use `--force` to overwrite:
 ```bash
-make run-migrate ARGS='--force'
+make run-load ARGS='--force'
 ```
 
 ### Verification fails
@@ -235,6 +235,6 @@ Check the error message. Common issues:
 ## File Locations
 
 - **Schema**: [src/load/db_schema.py](../src/load/db_schema.py)
-- **Migration**: [src/load/migrate_to_db.py](../src/load/migrate_to_db.py)
+- **Loading**: [src/load/load_data.py](../src/load/load_data.py)
 - **CLI**: [src/load/cli.py](../src/load/cli.py)
 - **DB Vector Store**: [src/query/vector_store_db.py](../src/query/vector_store_db.py)

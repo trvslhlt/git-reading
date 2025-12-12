@@ -158,8 +158,8 @@ def success(message: str) -> None:
     """Log a success message with green checkmark.
 
     Example:
-        >>> success("Migration complete!")
-        ✓ Migration complete!
+        >>> success("Load complete!")
+        ✓ Load complete!
     """
     console.print(f"[green]✓[/green] {message}")
 

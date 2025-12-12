@@ -141,8 +141,8 @@ sequenceDiagram
     FAISS->>FAISS: Pre-filter by metadata
     FAISS->>User: Return ranked results
 
-    User->>Load: make run-migrate
-    Load->>JSON: Read index
+    User->>Load: make run-load
+    Load->>Extractions: Read extraction files
     Load->>SQLite: Create relational schema
 ```
 
@@ -174,7 +174,7 @@ graph LR
 
     subgraph "Load Module"
         L1[Schema Manager]
-        L2[Migration Engine]
+        L2[Data Loader]
         L3[DB Utils]
     end
 
@@ -245,7 +245,7 @@ graph TD
     CMD -->|extract| C1[readings<br/>--notes-dir DIR<br/>--output JSON]
     CMD -->|normalize| C2{Subcommand}
     CMD -->|search| C3{Subcommand}
-    CMD -->|load-db| C4[migrate<br/>--input JSON<br/>--output DB]
+    CMD -->|load-db| C4[load<br/>--index-dir DIR<br/>--database DB]
 
     C2 -->|validate| C2A[Check markdown files<br/>Output: issues.json]
     C2 -->|learn| C2B[Analyze patterns<br/>Output: patterns.json]
@@ -285,7 +285,7 @@ graph TD
 1. **Normalize** (REQUIRED): Validate → Learn patterns → Fix issues
 2. **Extract** (BLOCKED): Parse markdown → JSON index
 3. **Search**: Build embeddings → Semantic query with pre-filtering
-4. **Load**: Migrate to relational database
+4. **Load**: Load data to relational database
 
 ### Dual Storage Strategy
 - **JSON**: Human-readable, version-controllable

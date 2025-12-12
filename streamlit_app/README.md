@@ -48,9 +48,9 @@ A multi-page dashboard for visualizing and exploring book reading notes extracte
    make run-extract
    ```
 
-2. **Migrate to database** (optional, for Database Explorer):
+2. **Load to database** (optional, for Database Explorer):
    ```bash
-   make run-migrate
+   make run-load
    ```
 
 3. **Build search index** (optional, for Semantic Search):
@@ -93,7 +93,7 @@ Whenever you add new reading notes:
 
 ```bash
 make run-extract                    # Re-extract from markdown
-make run-migrate ARGS='--force'     # Update database
+make run-load ARGS='--force'     # Update database
 make run-search-build               # Rebuild search index
 ```
 
@@ -129,7 +129,7 @@ Run `make run-extract` to generate the index.
 Run `make search-install` to install sentence-transformers and FAISS.
 
 ### "Database not found"
-Run `make run-migrate` to create the SQLite database.
+Run `make run-load` to create the SQLite database.
 
 ### "Vector store not found"
 Run `make run-search-build` to build the semantic search index.
