@@ -35,7 +35,7 @@ help:
 	@echo ""
 	@echo "Data Pipeline Commands:"
 	@echo "  make run-extract         - Extract reading notes from markdown files"
-	@echo "  make run-migrate         - Migrate JSON index to SQLite database"
+	@echo "  make run-migrate         - Migrate extraction files to SQLite database"
 	@echo "  make run-validate        - Validate markdown files against rules"
 	@echo "  make run-fix             - Interactively fix validation issues"
 	@echo "  make run-learn-patterns  - Learn validation patterns from corpus"
@@ -50,7 +50,7 @@ help:
 	@echo ""
 	@echo "Common Workflows:"
 	@echo "  # Extract notes (incremental) and build search index"
-	@echo "  make run-extract ARGS='--notes-dir readings --index-dir index'"
+	@echo "  make run-extract ARGS='--notes-dir readings'"
 	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
 	@echo ""
@@ -65,6 +65,9 @@ help:
 	@echo "      run-learn-patterns) REQUIRE explicit ARGS to prevent accidents."
 	@echo "      Individual run-* commands require manual dependency installation."
 	@echo "      Use Quick Start Workflows above for automatic setup."
+	@echo ""
+	@echo "Default directories are defined in src/common/constants.py:"
+	@echo "  INDEX_DIR, VECTOR_STORE_DIR, DATABASE_PATH"
 	@echo ""
 	@echo "For detailed command options, run: make <command> ARGS='--help'"
 
@@ -161,33 +164,38 @@ clean:
 # Extract reading notes from markdown files (incremental by default)
 # REQUIRES ARGS to prevent accidental file operations
 # CLI requires: --notes-dir (required at CLI level)
-# Usage: make run-extract ARGS='--notes-dir readings --index-dir index'
-#        make run-extract ARGS='--notes-dir readings --index-dir index --full'
+# Optional: --index-dir (default: INDEX_DIR from common.constants)
+# Usage: make run-extract ARGS='--notes-dir readings'
+#        make run-extract ARGS='--notes-dir readings --full'
+#        make run-extract ARGS='--notes-dir readings --index-dir custom/path'
 #        make run-extract ARGS='--help'
 run-extract:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
 		echo "Usage:"; \
-		echo "  make run-extract ARGS='--notes-dir readings --index-dir index'"; \
-		echo "  make run-extract ARGS='--notes-dir readings --index-dir index --full'"; \
+		echo "  make run-extract ARGS='--notes-dir readings'"; \
+		echo "  make run-extract ARGS='--notes-dir readings --full'"; \
 		echo "  make run-extract ARGS='--help'"; \
 		exit 1; \
 	fi
 	@echo "Extracting reading notes..."
 	PYTHONPATH=src uv run extract readings $(ARGS)
 
-# Migrate JSON index to SQLite database
+# Migrate extraction files to SQLite database
 # REQUIRES ARGS to prevent accidental file operations
-# CLI requires: --index, --database (both required at CLI level)
-# Usage: make run-migrate ARGS='--index book_index.json --database readings.db'
+# CLI requires: --index-dir, --database (both required at CLI level)
+# Note: See INDEX_DIR and DATABASE_PATH in common.constants for defaults
+# Usage: make run-migrate ARGS='--index-dir <path> --database <path>'
+#        make run-migrate ARGS='--index-dir <path> --database <path> --incremental'
 #        make run-migrate ARGS='--help'
 run-migrate:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
 		echo "Usage:"; \
-		echo "  make run-migrate ARGS='--index book_index.json --database readings.db'"; \
+		echo "  make run-migrate ARGS='--index-dir <path> --database <path>'"; \
+		echo "  make run-migrate ARGS='--index-dir <path> --database <path> --incremental'"; \
 		echo "  make run-migrate ARGS='--help'"; \
 		exit 1; \
 	fi
@@ -243,11 +251,12 @@ run-learn-patterns:
 # Semantic Search
 #
 
-# Build semantic search vector index from JSON index
+# Build semantic search vector index from extraction files
 # Requires: make search-install (or use: make search)
-# Default: reads from 'book_index.json', writes to '.faiss/' directory
-# Usage: make run-search-build
-#        make run-search-build ARGS='--index custom_index.json'
+# CLI requires: --index-dir, --output (both required at CLI level)
+# Note: See INDEX_DIR and VECTOR_STORE_DIR in common.constants for defaults
+# Usage: make run-search-build ARGS='--index-dir <path> --output <path>'
+#        make run-search-build ARGS='--index-dir <path> --output <path> --incremental'
 #        make run-search-build ARGS='--help'
 run-search-build:
 	@echo "Building search index..."

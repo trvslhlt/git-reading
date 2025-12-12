@@ -7,32 +7,52 @@ import json
 import sys
 from pathlib import Path
 
-from query.search import build_search_index, search_notes
+from common.constants import VECTOR_STORE_DIR
+from query.search import (
+    build_search_index_from_extractions,
+    search_notes,
+    update_search_index_incremental,
+)
 from query.vector_store import VectorStore
 
 
 def cmd_build(args):
     """Build the vector search index."""
-    index_path = Path(args.index)
-    if not index_path.exists():
-        print(f"Error: Index file not found: {index_path}")
-        print("Run 'extract readings' first to create the index.")
-        sys.exit(1)
-
-    output_dir = Path(args.output)
-
     # Parse sections if provided
     sections = None
     if args.sections:
         sections = [s.strip().lower() for s in args.sections.split(",")]
         print(f"Indexing sections: {', '.join(sections)}")
 
-    build_search_index(
-        index_path=index_path,
-        output_dir=output_dir,
-        model_name=args.model,
-        sections_to_index=sections,
-    )
+    output_dir = Path(args.output)
+    index_dir = Path(args.index_dir)
+
+    if not index_dir.exists():
+        print(f"Error: Index directory not found: {index_dir}")
+        print("Run 'extract readings' first to create extraction files.")
+        sys.exit(1)
+
+    if args.incremental:
+        # Incremental update mode
+        if not output_dir.exists():
+            print(f"Error: Vector store not found: {output_dir}")
+            print("Run full build first (without --incremental).")
+            sys.exit(1)
+
+        update_search_index_incremental(
+            index_dir=index_dir,
+            vector_store_dir=output_dir,
+            sections_to_index=sections,
+        )
+
+    else:
+        # Full rebuild mode
+        build_search_index_from_extractions(
+            index_dir=index_dir,
+            output_dir=output_dir,
+            model_name=args.model,
+            sections_to_index=sections,
+        )
 
 
 def cmd_search(args):
@@ -117,19 +137,25 @@ def main():
     # Build command
     build_parser = subparsers.add_parser(
         "build",
-        help="Build vector search index from JSON index",
+        help="Build vector search index from extraction files",
     )
+
     build_parser.add_argument(
-        "--index",
+        "--index-dir",
         "-i",
         required=True,
-        help="Path to JSON index file",
+        help="Path to directory containing extraction files",
     )
     build_parser.add_argument(
         "--output",
         "-o",
         required=True,
         help="Output directory for vector store",
+    )
+    build_parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Apply incremental updates (requires existing vector store)",
     )
     build_parser.add_argument(
         "--model",
@@ -155,8 +181,8 @@ def main():
     search_parser.add_argument(
         "--vector-store",
         "-v",
-        default=".tmp/vector_store",
-        help="Path to vector store directory",
+        default=str(VECTOR_STORE_DIR),
+        help=f"Path to vector store directory (default: {VECTOR_STORE_DIR})",
     )
     search_parser.add_argument(
         "--top-k",
@@ -191,8 +217,8 @@ def main():
     stats_parser.add_argument(
         "--vector-store",
         "-v",
-        default=".tmp/vector_store",
-        help="Path to vector store directory",
+        default=str(VECTOR_STORE_DIR),
+        help=f"Path to vector store directory (default: {VECTOR_STORE_DIR})",
     )
 
     args = parser.parse_args()

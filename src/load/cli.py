@@ -4,32 +4,43 @@ import argparse
 import sys
 from pathlib import Path
 
-from load.migrate_to_db import migrate_from_json, verify_migration
+from load.migrate_to_db import (
+    migrate_from_extractions,
+    migrate_incremental,
+)
 
 
 def cmd_migrate(args):
-    """Migrate from JSON to SQLite database."""
-    index_path = Path(args.index)
-    if not index_path.exists():
-        print(f"Error: Index file not found: {index_path}")
-        print("Run 'make run-extract' first to create the index.")
-        sys.exit(1)
-
+    """Migrate from extraction files to SQLite database."""
     db_path = Path(args.database)
+    index_dir = Path(args.index_dir)
 
-    if db_path.exists() and not args.force:
-        print(f"Error: Database already exists: {db_path}")
-        print("Use --force to overwrite.")
+    if not index_dir.exists():
+        print(f"Error: Index directory not found: {index_dir}")
+        print("Run 'make run-extract' first to create extraction files.")
         sys.exit(1)
 
-    if args.force and db_path.exists():
-        db_path.unlink()
-        print(f"Removed existing database: {db_path}")
+    if args.incremental:
+        # Incremental update mode
+        if not db_path.exists():
+            print(f"Error: Database not found: {db_path}")
+            print("Run full migration first (without --incremental).")
+            sys.exit(1)
 
-    migrate_from_json(index_path, db_path, verbose=True)
+        migrate_incremental(index_dir, db_path, verbose=True)
 
-    if args.verify:
-        verify_migration(db_path, index_path)
+    else:
+        # Full rebuild mode
+        if db_path.exists() and not args.force:
+            print(f"Error: Database already exists: {db_path}")
+            print("Use --force to overwrite or --incremental to update.")
+            sys.exit(1)
+
+        if args.force and db_path.exists():
+            db_path.unlink()
+            print(f"Removed existing database: {db_path}")
+
+        migrate_from_extractions(index_dir, db_path, verbose=True)
 
 
 def main():
@@ -44,13 +55,14 @@ def main():
     # Migrate command
     migrate_parser = subparsers.add_parser(
         "migrate",
-        help="Migrate from JSON index to SQLite database",
+        help="Migrate from extraction files to SQLite database",
     )
+
     migrate_parser.add_argument(
-        "--index",
+        "--index-dir",
         "-i",
         required=True,
-        help="Path to JSON index file",
+        help="Path to directory containing extraction files",
     )
     migrate_parser.add_argument(
         "--database",
@@ -59,15 +71,14 @@ def main():
         help="Path to SQLite database file",
     )
     migrate_parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Apply incremental updates (requires existing database)",
+    )
+    migrate_parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing database",
-    )
-    migrate_parser.add_argument(
-        "--verify",
-        action="store_true",
-        default=True,
-        help="Verify migration after completion (default: True)",
     )
 
     args = parser.parse_args()
