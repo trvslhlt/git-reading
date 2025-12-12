@@ -1,4 +1,4 @@
-"""Integration tests for database migration."""
+"""Integration tests for database loading."""
 
 import json
 import sqlite3
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from load.db_schema import create_database
-from load.migrate_to_db import migrate_from_json, verify_migration
+from load.load_data import load_from_json, verify_load
 
 
 @pytest.fixture
@@ -30,11 +30,11 @@ def temp_db_path(tmp_path):
     return tmp_path / "test.db"
 
 
-class TestMigrateFromJson:
-    """Tests for migrate_from_json function."""
+class TestLoadFromJson:
+    """Tests for load_from_json function."""
 
-    def test_full_migration_with_author_fields(self, temp_json_file, temp_db_path):
-        """Test full migration with author_first_name and author_last_name."""
+    def test_full_load_with_author_fields(self, temp_json_file, temp_db_path):
+        """Test full data load with author_first_name and author_last_name."""
         books = [
             {
                 "title": "Test Book",
@@ -50,7 +50,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         # Verify database contents
         conn = sqlite3.connect(temp_db_path)
@@ -75,8 +75,8 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_only_last_name(self, temp_json_file, temp_db_path):
-        """Test migration with only last name (empty first name)."""
+    def test_load_only_last_name(self, temp_json_file, temp_db_path):
+        """Test data load with only last name (empty first name)."""
         books = [
             {
                 "title": "Book",
@@ -87,7 +87,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -98,8 +98,8 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_only_first_name(self, temp_json_file, temp_db_path):
-        """Test migration with only first name (empty last name)."""
+    def test_load_only_first_name(self, temp_json_file, temp_db_path):
+        """Test data load with only first name (empty last name)."""
         books = [
             {
                 "title": "Book",
@@ -110,7 +110,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -121,8 +121,8 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_unknown_author(self, temp_json_file, temp_db_path):
-        """Test migration with empty author names."""
+    def test_load_unknown_author(self, temp_json_file, temp_db_path):
+        """Test data load with empty author names."""
         books = [
             {
                 "title": "Book",
@@ -133,7 +133,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -144,7 +144,7 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_same_author_multiple_books(self, temp_json_file, temp_db_path):
+    def test_load_same_author_multiple_books(self, temp_json_file, temp_db_path):
         """Test that same author is reused for multiple books."""
         books = [
             {
@@ -162,7 +162,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -189,8 +189,8 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_multiple_sections(self, temp_json_file, temp_db_path):
-        """Test migration with multiple section types."""
+    def test_load_multiple_sections(self, temp_json_file, temp_db_path):
+        """Test data load with multiple section types."""
         books = [
             {
                 "title": "Book",
@@ -205,7 +205,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -220,7 +220,7 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_faiss_indices_sequential(self, temp_json_file, temp_db_path):
+    def test_load_faiss_indices_sequential(self, temp_json_file, temp_db_path):
         """Test that FAISS indices are sequential starting from 0."""
         books = [
             {
@@ -238,7 +238,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -251,11 +251,11 @@ class TestMigrateFromJson:
 
         conn.close()
 
-    def test_migration_empty_sections(self, temp_json_file, temp_db_path):
-        """Test migration with empty sections list.
+    def test_load_empty_sections(self, temp_json_file, temp_db_path):
+        """Test data load with empty sections list.
 
         Note: Current implementation only creates books/authors when notes exist.
-        Books with no content are not migrated to the database.
+        Books with no content are not loaded to the database.
         """
         books = [
             {
@@ -267,7 +267,7 @@ class TestMigrateFromJson:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -285,11 +285,11 @@ class TestMigrateFromJson:
         conn.close()
 
 
-class TestVerifyMigration:
-    """Tests for verify_migration function."""
+class TestVerifyLoad:
+    """Tests for verify_load function."""
 
-    def test_verify_successful_migration(self, temp_json_file, temp_db_path):
-        """Test that verification passes for successful migration."""
+    def test_verify_successful_load(self, temp_json_file, temp_db_path):
+        """Test that verification passes for successful data load."""
         books = [
             {
                 "title": "Book",
@@ -303,10 +303,10 @@ class TestVerifyMigration:
         ]
 
         json_path = temp_json_file(books)
-        migrate_from_json(json_path, temp_db_path, verbose=False)
+        load_from_json(json_path, temp_db_path, verbose=False)
 
         # Verification should pass
-        result = verify_migration(temp_db_path, json_path)
+        result = verify_load(temp_db_path, json_path)
         assert result is True
 
     def test_verify_detects_missing_notes(self, temp_json_file, temp_db_path):
@@ -355,5 +355,5 @@ class TestVerifyMigration:
         conn.close()
 
         # Verification should fail
-        result = verify_migration(temp_db_path, json_path)
+        result = verify_load(temp_db_path, json_path)
         assert result is False

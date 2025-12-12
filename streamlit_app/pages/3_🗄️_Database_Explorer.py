@@ -45,8 +45,8 @@ def main():
     db_path = Path("./data/readings.db")
     if not db_path.exists():
         st.warning(
-            "Database not found. Run the migration first:\n\n"
-            "```bash\nload-db migrate --index-dir <path> --database <path>\n```"
+            "Database not found. Load the data first:\n\n"
+            "```bash\nload-db load --index-dir <path> --database <path>\n```"
         )
         st.info(
             "💡 **What is the database?**\n\n"

@@ -1,7 +1,7 @@
-"""Migrate from index.json to SQLite database.
+"""Load data from extraction files to SQLite database.
 
-This script migrates the existing index.json structure to a relational SQLite database
-while preserving the FAISS vector store.
+This module loads data from extraction files into a relational SQLite database
+while supporting incremental updates.
 """
 
 import json
@@ -53,8 +53,8 @@ def store_checkpoint(conn: sqlite3.Connection, commit_hash: str) -> None:
     conn.commit()
 
 
-def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
-    """Migrate data from index.json to SQLite database.
+def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
+    """Load data from index.json to SQLite database.
 
     Args:
         json_path: Path to index.json file
@@ -106,7 +106,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         logger.info(f"Creating database at {db_path}...")
     create_database(db_path)
 
-    # Connect and migrate
+    # Connect and load
     conn = get_connection(db_path)
     cursor = conn.cursor()
 
@@ -115,7 +115,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     authors_seen: dict[str, str] = {}  # name -> id mapping
 
     if verbose:
-        logger.info("Migrating data...")
+        logger.info("Loading data...")
 
     for i, note in enumerate(notes):
         # Extract data from note
@@ -202,7 +202,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         cursor.execute("SELECT COUNT(*) FROM notes")
         note_count = cursor.fetchone()[0]
 
-        logger.info("\n[green]✓[/green] Migration complete!")
+        logger.info("\n[green]✓[/green] Load complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
         logger.info(f"  Notes: [bold]{note_count}[/bold]")
@@ -210,8 +210,8 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     conn.close()
 
 
-def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
-    """Migrate data from extraction files to SQLite database (full rebuild).
+def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
+    """Load data from extraction files to SQLite database (full rebuild).
 
     Args:
         index_dir: Directory containing extraction files
@@ -243,7 +243,7 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
         logger.info(f"Creating database at {db_path}...")
     create_database(db_path)
 
-    # Connect and migrate
+    # Connect and load
     conn = get_connection(db_path)
     cursor = conn.cursor()
 
@@ -252,7 +252,7 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
     authors_seen: dict[str, str] = {}  # name -> id mapping
 
     if verbose:
-        logger.info("Migrating data...")
+        logger.info("Loading data...")
 
     for i, item in enumerate(items):
         # Extract data from item
@@ -341,7 +341,7 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
         cursor.execute("SELECT COUNT(*) FROM notes")
         note_count = cursor.fetchone()[0]
 
-        logger.info("\n[green]✓[/green] Migration complete!")
+        logger.info("\n[green]✓[/green] Load complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
         logger.info(f"  Notes: [bold]{note_count}[/bold]")
@@ -349,7 +349,7 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
     conn.close()
 
 
-def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
+def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
     """Apply incremental updates from extraction files to existing database.
 
     Args:
@@ -364,7 +364,7 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
     db_path = Path(db_path)
 
     if not db_path.exists():
-        raise ValueError(f"Database not found: {db_path}. Run full migration first.")
+        raise ValueError(f"Database not found: {db_path}. Run full load first.")
 
     # Connect to database
     conn = get_connection(db_path)
@@ -373,7 +373,7 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
     last_commit = get_checkpoint(conn)
     if not last_commit:
         conn.close()
-        raise ValueError("No checkpoint found in database. Run full migration first.")
+        raise ValueError("No checkpoint found in database. Run full load first.")
 
     if verbose:
         logger.info(f"Last processed commit: {last_commit[:7]}")
@@ -478,7 +478,7 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
     conn.commit()
 
     if verbose:
-        logger.info("\n[green]✓[/green] Incremental migration complete!")
+        logger.info("\n[green]✓[/green] Incremental load complete!")
         logger.info(f"  Adds: [bold]{adds}[/bold]")
         logger.info(f"  Updates: [bold]{updates}[/bold]")
         logger.info(f"  Deletes: [bold]{deletes}[/bold]")
@@ -486,8 +486,8 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
     conn.close()
 
 
-def verify_migration(db_path: str | Path, json_path: str | Path) -> bool:
-    """Verify that migration preserved all data.
+def verify_load(db_path: str | Path, json_path: str | Path) -> bool:
+    """Verify that data load preserved all data.
 
     Args:
         db_path: Path to SQLite database
@@ -532,7 +532,7 @@ def verify_migration(db_path: str | Path, json_path: str | Path) -> bool:
         logger.error("[red]✗[/red] FAISS indices are not sequential")
         return False
 
-    logger.info("[green]✓[/green] Migration verification passed")
+    logger.info("[green]✓[/green] Load verification passed")
     return True
 
 
@@ -540,11 +540,11 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) < 3:
-        logger.error("Usage: python migrate_to_db.py <index.json> <database.db>")
+        logger.error("Usage: python load_data.py <index.json> <database.db>")
         sys.exit(1)
 
     json_path = sys.argv[1]
     db_path = sys.argv[2]
 
-    migrate_from_json(json_path, db_path, verbose=True)
-    verify_migration(db_path, json_path)
+    load_from_json(json_path, db_path, verbose=True)
+    verify_load(db_path, json_path)

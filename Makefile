@@ -2,7 +2,7 @@
 # Index and query reading notes from markdown files using git history
 
 .PHONY: help install test test-cov test-cov-report lint format clean \
-	run-extract run-migrate run-validate run-fix run-learn-patterns \
+	run-extract run-load run-validate run-fix run-learn-patterns \
 	run-search-build run-search-query run-search-stats run-streamlit \
 	dev-install streamlit-install search-install \
 	streamlit search dev
@@ -35,7 +35,7 @@ help:
 	@echo ""
 	@echo "Data Pipeline Commands:"
 	@echo "  make run-extract         - Extract reading notes from markdown files"
-	@echo "  make run-migrate         - Migrate extraction files to SQLite database"
+	@echo "  make run-load            - Load extraction files to SQLite database"
 	@echo "  make run-validate        - Validate markdown files against rules"
 	@echo "  make run-fix             - Interactively fix validation issues"
 	@echo "  make run-learn-patterns  - Learn validation patterns from corpus"
@@ -61,7 +61,7 @@ help:
 	@echo "  # Launch visualization"
 	@echo "  make streamlit           # Auto-installs and launches"
 	@echo ""
-	@echo "Note: Commands that read/write files (run-extract, run-migrate, run-validate,"
+	@echo "Note: Commands that read/write files (run-extract, run-load, run-validate,"
 	@echo "      run-learn-patterns) REQUIRE explicit ARGS to prevent accidents."
 	@echo "      Individual run-* commands require manual dependency installation."
 	@echo "      Use Quick Start Workflows above for automatic setup."
@@ -182,25 +182,25 @@ run-extract:
 	@echo "Extracting reading notes..."
 	PYTHONPATH=src uv run extract readings $(ARGS)
 
-# Migrate extraction files to SQLite database
+# Load extraction files to SQLite database
 # REQUIRES ARGS to prevent accidental file operations
 # CLI requires: --index-dir, --database (both required at CLI level)
 # Note: See INDEX_DIR and DATABASE_PATH in common.constants for defaults
-# Usage: make run-migrate ARGS='--index-dir <path> --database <path>'
-#        make run-migrate ARGS='--index-dir <path> --database <path> --incremental'
-#        make run-migrate ARGS='--help'
-run-migrate:
+# Usage: make run-load ARGS='--index-dir <path> --database <path>'
+#        make run-load ARGS='--index-dir <path> --database <path> --incremental'
+#        make run-load ARGS='--help'
+run-load:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
 		echo "Usage:"; \
-		echo "  make run-migrate ARGS='--index-dir <path> --database <path>'"; \
-		echo "  make run-migrate ARGS='--index-dir <path> --database <path> --incremental'"; \
-		echo "  make run-migrate ARGS='--help'"; \
+		echo "  make run-load ARGS='--index-dir <path> --database <path>'"; \
+		echo "  make run-load ARGS='--index-dir <path> --database <path> --incremental'"; \
+		echo "  make run-load ARGS='--help'"; \
 		exit 1; \
 	fi
-	@echo "Migrating to database..."
-	PYTHONPATH=src uv run load-db migrate $(ARGS)
+	@echo "Loading to database..."
+	PYTHONPATH=src uv run load-db load $(ARGS)
 
 # Validate markdown files against normalization rules
 # REQUIRES ARGS to prevent accidental file operations
