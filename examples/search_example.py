@@ -7,22 +7,22 @@ rather than the CLI.
 
 from pathlib import Path
 
+from common.constants import VECTOR_STORE_DIR
 from query.embeddings import EmbeddingModel
-from query.search import build_search_index, search_notes
+from query.search import build_search_index_from_extractions, search_notes
 
 
-# Example 1: Build a search index
+# Example 1: Build a search index from extraction files
 def build_index_example():
-    """Build a search index from JSON."""
-    index_path = Path(".tmp/index.json")
-    output_dir = Path(".tmp/vector_store")
+    """Build a search index from extraction files."""
+    index_dir = Path("data/index")  # Directory containing extraction files
+    output_dir = Path("data/vector_store")
 
-    # Build the index - you can customize which sections to index
-    build_search_index(
-        index_path=index_path,
+    # Build the index from extraction files
+    build_search_index_from_extractions(
+        index_dir=index_dir,
         output_dir=output_dir,
         model_name="all-MiniLM-L6-v2",  # Fast, efficient model
-        sections_to_index=["notes", "excerpts"],  # Only index these sections
     )
 
 
@@ -31,7 +31,7 @@ def search_example():
     """Search for content using semantic similarity."""
     results = search_notes(
         query="mortality and death",
-        vector_store_dir=Path(".tmp/vector_store"),
+        vector_store_dir=Path(VECTOR_STORE_DIR),
         k=10,  # Get top 10 results
     )
 
@@ -48,7 +48,7 @@ def search_by_author_example():
     """Search within a specific author's work."""
     results = search_notes(
         query="narrative technique",
-        vector_store_dir=Path(".tmp/vector_store"),
+        vector_store_dir=Path(VECTOR_STORE_DIR),
         k=5,
         filter_author="John Barth",
     )
@@ -61,12 +61,12 @@ def search_by_author_example():
 # Example 4: Use a different embedding model
 def custom_model_example():
     """Use a different embedding model for higher quality."""
-    index_path = Path(".tmp/index.json")
-    output_dir = Path(".tmp/vector_store_large")
+    index_dir = Path("data/index")
+    output_dir = Path("data/vector_store_large")
 
     # Use a larger, more accurate model
-    build_search_index(
-        index_path=index_path,
+    build_search_index_from_extractions(
+        index_dir=index_dir,
         output_dir=output_dir,
         model_name="all-mpnet-base-v2",  # Higher quality, slower
     )

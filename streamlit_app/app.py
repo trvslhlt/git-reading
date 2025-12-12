@@ -10,6 +10,8 @@ Run with: streamlit run streamlit_app/app.py
 
 import streamlit as st
 
+from common.constants import DATABASE_PATH, INDEX_DIR, VECTOR_STORE_DIR
+
 # Page configuration
 st.set_page_config(
     page_title="Reading Notes Explorer",
@@ -19,24 +21,24 @@ st.set_page_config(
 )
 
 # Initialize session state
-if "index_path" not in st.session_state:
-    st.session_state.index_path = ".tmp/index.json"
+if "index_dir" not in st.session_state:
+    st.session_state.index_dir = str(INDEX_DIR)
 
 # Sidebar configuration
 with st.sidebar:
     st.header("⚙️ Configuration")
 
-    # Index path setting
-    index_path = st.text_input(
-        "Index JSON Path",
-        value=st.session_state.index_path,
-        help="Path to the generated index.json file",
-        key="index_path_input",
+    # Index directory setting
+    index_dir = st.text_input(
+        "Extraction Files Directory",
+        value=st.session_state.index_dir,
+        help="Path to the directory containing extraction files",
+        key="index_dir_input",
     )
 
     # Update session state
-    if index_path != st.session_state.index_path:
-        st.session_state.index_path = index_path
+    if index_dir != st.session_state.index_dir:
+        st.session_state.index_dir = index_dir
 
     st.markdown("---")
 
@@ -173,15 +175,15 @@ col1, col2, col3 = st.columns(3)
 with col1:
     from pathlib import Path
 
-    index_exists = Path(st.session_state.index_path).exists()
+    index_exists = Path(st.session_state.index_dir).exists()
     if index_exists:
-        st.success("✅ Index JSON found")
+        st.success("✅ Extraction files found")
     else:
-        st.error("❌ Index JSON not found")
+        st.error("❌ Extraction files not found")
         st.caption("Run `extract readings --notes-dir <path>`")
 
 with col2:
-    db_exists = Path(".tmp/readings.db").exists()
+    db_exists = Path(DATABASE_PATH).exists()
     if db_exists:
         st.success("✅ Database found")
     else:
@@ -189,7 +191,7 @@ with col2:
         st.caption("Run `load-db migrate --index-dir <path> --database <path>`")
 
 with col3:
-    vector_exists = Path(".tmp/vector_store").exists()
+    vector_exists = Path(VECTOR_STORE_DIR).exists()
     if vector_exists:
         st.success("✅ Search index found")
     else:

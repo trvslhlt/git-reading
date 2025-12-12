@@ -83,9 +83,9 @@ Navigate using the sidebar or the buttons on the main page.
 
 ## Configuration
 
-- **Index Path**: Configure in the sidebar (default: `.tmp/index.json`)
-- **Database Path**: Hardcoded to `.tmp/readings.db`
-- **Vector Store**: Hardcoded to `.tmp/vector_store/`
+- **Index Path**: Configure in the sidebar (default: `INDEX_DIR`)
+- **Database Path**: Hardcoded to `DATABASE_PATH`
+- **Vector Store**: Hardcoded to `VECTOR_STORE_DIR`
 
 ## Updating Data
 
