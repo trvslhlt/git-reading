@@ -1,7 +1,7 @@
 """Database schema definition for git-reading metadata storage.
 
 This module defines the SQLite schema for storing book metadata, author information,
-and chunk references that complement the FAISS vector store.
+and note references that complement the FAISS vector store.
 """
 
 import sqlite3
@@ -88,9 +88,9 @@ def create_database(db_path: str | Path) -> None:
         )
     """)
 
-    # Chunks table - references to excerpts with their vector positions
+    # Notes table - references to excerpts with their vector positions
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS chunks (
+        CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             item_id TEXT UNIQUE,
             book_id TEXT NOT NULL,
@@ -125,9 +125,9 @@ def create_database(db_path: str | Path) -> None:
     """)
 
     # Create indexes for common queries
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_book_id ON chunks(book_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_faiss_index ON chunks(faiss_index)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_item_id ON chunks(item_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_book_id ON notes(book_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_faiss_index ON notes(faiss_index)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_item_id ON notes(item_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id)")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id)"

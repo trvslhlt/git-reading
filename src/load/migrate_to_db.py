@@ -77,8 +77,8 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     if verbose:
         logger.info(f"Found [bold]{len(books)}[/bold] books")
 
-    # Flatten books into chunks
-    chunks = []
+    # Flatten books into notes
+    notes = []
     for book in books:
         title = book.get("title", "Unknown")
         first_name = book.get("author_first_name", "Unknown")
@@ -88,7 +88,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         for section_name, excerpts in sections_data.items():
             if isinstance(excerpts, list):
                 for excerpt in excerpts:
-                    chunks.append(
+                    notes.append(
                         {
                             "title": title,
                             "author_first_name": first_name,
@@ -99,7 +99,7 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
                     )
 
     if verbose:
-        logger.info(f"Extracted [bold]{len(chunks)}[/bold] chunks from books")
+        logger.info(f"Extracted [bold]{len(notes)}[/bold] notes from books")
 
     # Create database
     if verbose:
@@ -117,17 +117,17 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
     if verbose:
         logger.info("Migrating data...")
 
-    for i, chunk in enumerate(chunks):
-        # Extract data from chunk
-        title = chunk.get("title", "Unknown")
+    for i, note in enumerate(notes):
+        # Extract data from note
+        title = note.get("title", "Unknown")
 
         # Extract author name parts
-        author_first_name = chunk.get("author_first_name", "")
-        author_last_name = chunk.get("author_last_name", "")
+        author_first_name = note.get("author_first_name", "")
+        author_last_name = note.get("author_last_name", "")
         author = generate_author(author_first_name, author_last_name)
 
-        section = chunk.get("section", "")
-        excerpt = chunk.get("excerpt", "")
+        section = note.get("section", "")
+        excerpt = note.get("excerpt", "")
 
         # Generate IDs
         author_id = generate_author_id(author)
@@ -177,17 +177,17 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
                 # Book already exists
                 pass
 
-        # Insert chunk
+        # Insert note
         cursor.execute(
             """
-            INSERT INTO chunks (book_id, section, excerpt, faiss_index)
+            INSERT INTO notes (book_id, section, excerpt, faiss_index)
             VALUES (?, ?, ?, ?)
         """,
             (book_id, section, excerpt, i),
         )
 
         if verbose and (i + 1) % 500 == 0:
-            logger.debug(f"  Processed {i + 1}/{len(chunks)} chunks...")
+            logger.debug(f"  Processed {i + 1}/{len(notes)} notes...")
 
     conn.commit()
 
@@ -199,13 +199,13 @@ def migrate_from_json(json_path: str | Path, db_path: str | Path, verbose: bool 
         cursor.execute("SELECT COUNT(*) FROM authors")
         author_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM chunks")
-        chunk_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM notes")
+        note_count = cursor.fetchone()[0]
 
         logger.info("\n[green]✓[/green] Migration complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
-        logger.info(f"  Chunks: [bold]{chunk_count}[/bold]")
+        logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
     conn.close()
 
@@ -311,10 +311,10 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
                 # Book already exists
                 pass
 
-        # Insert chunk with item_id
+        # Insert note with item_id
         cursor.execute(
             """
-            INSERT INTO chunks (item_id, book_id, section, excerpt, faiss_index)
+            INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
             VALUES (?, ?, ?, ?, ?)
         """,
             (item.item_id, book_id, section, excerpt, i),
@@ -338,13 +338,13 @@ def migrate_from_extractions(index_dir: Path, db_path: Path, verbose: bool = Tru
         cursor.execute("SELECT COUNT(*) FROM authors")
         author_count = cursor.fetchone()[0]
 
-        cursor.execute("SELECT COUNT(*) FROM chunks")
-        chunk_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM notes")
+        note_count = cursor.fetchone()[0]
 
         logger.info("\n[green]✓[/green] Migration complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
-        logger.info(f"  Chunks: [bold]{chunk_count}[/bold]")
+        logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
     conn.close()
 
@@ -441,14 +441,14 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
                 )
 
                 # Get next faiss_index
-                cursor.execute("SELECT MAX(faiss_index) FROM chunks")
+                cursor.execute("SELECT MAX(faiss_index) FROM notes")
                 max_index = cursor.fetchone()[0]
                 next_index = (max_index + 1) if max_index is not None else 0
 
-                # Insert new chunk
+                # Insert new note
                 cursor.execute(
                     """
-                    INSERT INTO chunks (item_id, book_id, section, excerpt, faiss_index)
+                    INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
                     VALUES (?, ?, ?, ?, ?)
                 """,
                     (item.item_id, book_id, item.section, item.content, next_index),
@@ -456,10 +456,10 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
                 adds += 1
 
             elif item.operation == "update":
-                # Update existing chunk
+                # Update existing note
                 cursor.execute(
                     """
-                    UPDATE chunks
+                    UPDATE notes
                     SET section = ?, excerpt = ?
                     WHERE item_id = ?
                 """,
@@ -468,8 +468,8 @@ def migrate_incremental(index_dir: Path, db_path: Path, verbose: bool = True) ->
                 updates += 1
 
             elif item.operation == "delete":
-                # Delete chunk
-                cursor.execute("DELETE FROM chunks WHERE item_id = ?", (item.item_id,))
+                # Delete note
+                cursor.execute("DELETE FROM notes WHERE item_id = ?", (item.item_id,))
                 deletes += 1
 
         # Update checkpoint after each extraction
@@ -496,34 +496,34 @@ def verify_migration(db_path: str | Path, json_path: str | Path) -> bool:
     Returns:
         True if verification passes
     """
-    # Load JSON and count chunks
+    # Load JSON and count notes
     with open(json_path) as f:
         data = json.load(f)
 
     books = data.get("books", [])
-    json_chunk_count = 0
+    json_note_count = 0
     for book in books:
         sections_data = book.get("sections", {})
         for _, excerpts in sections_data.items():
             if isinstance(excerpts, list):
-                json_chunk_count += len(excerpts)
+                json_note_count += len(excerpts)
 
     # Check DB
     conn = get_connection(db_path)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM chunks")
-    db_chunk_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM notes")
+    db_note_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT faiss_index FROM chunks ORDER BY faiss_index")
+    cursor.execute("SELECT faiss_index FROM notes ORDER BY faiss_index")
     faiss_indices = [row[0] for row in cursor.fetchall()]
 
     conn.close()
 
     # Verify
-    if json_chunk_count != db_chunk_count:
+    if json_note_count != db_note_count:
         logger.error(
-            f"[red]✗[/red] Chunk count mismatch: JSON={json_chunk_count}, DB={db_chunk_count}"
+            f"[red]✗[/red] Note count mismatch: JSON={json_note_count}, DB={db_note_count}"
         )
         return False
 

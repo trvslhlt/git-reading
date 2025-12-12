@@ -80,8 +80,8 @@ install:
 	uv pip install .
 
 dev-install:
-	@echo "Installing with dev dependencies..."
-	uv sync --extra dev --extra test
+	@echo "Installing with dev dependencies (includes search for full test coverage)..."
+	uv sync --extra dev --extra test-full
 	uv pip install .
 
 streamlit-install:

@@ -171,29 +171,29 @@ WHERE a.name = 'Philip Roth';
 
 -- Count excerpts per section
 SELECT section, COUNT(*) as count
-FROM chunks
+FROM notes
 GROUP BY section
 ORDER BY count DESC;
 
 -- Top 10 most excerpted books
 SELECT b.title, a.name, COUNT(*) as excerpt_count
-FROM chunks c
-JOIN books b ON c.book_id = b.id
+FROM notes n
+JOIN books b ON n.book_id = b.id
 JOIN book_authors ba ON b.id = ba.book_id
 JOIN authors a ON ba.author_id = a.id
-WHERE c.section = 'excerpts'
+WHERE n.section = 'excerpts'
 GROUP BY b.id, b.title, a.name
 ORDER BY excerpt_count DESC
 LIMIT 10;
 
 -- Find books with notes containing specific words
 SELECT DISTINCT b.title, a.name
-FROM chunks c
-JOIN books b ON c.book_id = b.id
+FROM notes n
+JOIN books b ON n.book_id = b.id
 JOIN book_authors ba ON b.id = ba.book_id
 JOIN authors a ON ba.author_id = a.id
-WHERE c.section = 'notes'
-AND c.excerpt LIKE '%meaning%';
+WHERE n.section = 'notes'
+AND n.excerpt LIKE '%meaning%';
 """,
                 language="sql",
             )
@@ -295,7 +295,7 @@ AND c.excerpt LIKE '%meaning%';
             try:
                 query = """
                     SELECT section, COUNT(*) as count
-                    FROM chunks
+                    FROM notes
                     GROUP BY section
                     ORDER BY count DESC
                 """
@@ -310,11 +310,11 @@ AND c.excerpt LIKE '%meaning%';
         try:
             query = """
                 SELECT b.title, a.name as author, COUNT(*) as excerpt_count
-                FROM chunks c
-                JOIN books b ON c.book_id = b.id
+                FROM notes n
+                JOIN books b ON n.book_id = b.id
                 JOIN book_authors ba ON b.id = ba.book_id
                 JOIN authors a ON ba.author_id = a.id
-                WHERE c.section = 'excerpts'
+                WHERE n.section = 'excerpts'
                 GROUP BY b.id, b.title, a.name
                 ORDER BY excerpt_count DESC
                 LIMIT 10

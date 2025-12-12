@@ -20,8 +20,8 @@ logger = get_logger(__name__)
 
 
 @dataclass
-class TextChunk:
-    """Represents a chunk of text with metadata."""
+class TextNote:
+    """Represents a note of text with metadata."""
 
     text: str
     book_title: str
@@ -30,7 +30,7 @@ class TextChunk:
     section: str
     source_file: str
     date_read: str | None = None
-    chunk_id: str | None = None
+    note_id: str | None = None
     item_id: str | None = None  # For tracking across incremental updates
 
     @property
@@ -65,7 +65,7 @@ class VectorStore:
         self.dimension = dimension
         # Use IndexFlatL2 which supports ID mapping
         self.index = faiss.IndexFlatL2(dimension)
-        self.chunks: list[TextChunk] = []
+        self.notes: list[TextNote] = []
 
         # Build lookup tables for fast filtering
         self.author_to_indices: dict[str, list[int]] = {}
@@ -77,19 +77,19 @@ class VectorStore:
         self.deleted_indices: set[int] = set()  # Track deleted items
         self.checkpoint: str | None = None  # Last processed commit hash
 
-    def add(self, embeddings: np.ndarray, chunks: list[TextChunk]):
+    def add(self, embeddings: np.ndarray, notes: list[TextNote]):
         """
-        Add embeddings and their associated chunks to the store.
+        Add embeddings and their associated notes to the store.
 
         Args:
             embeddings: numpy array of shape (n, dimension)
-            chunks: list of TextChunk objects corresponding to each embedding
+            notes: list of TextNote objects corresponding to each embedding
         """
-        if len(embeddings) != len(chunks):
-            raise ValueError("Number of embeddings must match number of chunks")
+        if len(embeddings) != len(notes):
+            raise ValueError("Number of embeddings must match number of notes")
 
-        # Get the starting index for new chunks
-        start_idx = len(self.chunks)
+        # Get the starting index for new notes
+        start_idx = len(self.notes)
 
         # Normalize embeddings for cosine similarity
         normalized = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
@@ -97,29 +97,29 @@ class VectorStore:
         # Add to FAISS index
         self.index.add(normalized.astype(np.float32))
 
-        # Store chunk metadata and build lookup tables
-        for i, chunk in enumerate(chunks):
+        # Store note metadata and build lookup tables
+        for i, note in enumerate(notes):
             idx = start_idx + i
-            self.chunks.append(chunk)
+            self.notes.append(note)
 
             # Track item_id mapping if available
-            if chunk.item_id:
-                self.item_id_to_index[chunk.item_id] = idx
+            if note.item_id:
+                self.item_id_to_index[note.item_id] = idx
 
             # Build author lookup
-            if chunk.author not in self.author_to_indices:
-                self.author_to_indices[chunk.author] = []
-            self.author_to_indices[chunk.author].append(idx)
+            if note.author not in self.author_to_indices:
+                self.author_to_indices[note.author] = []
+            self.author_to_indices[note.author].append(idx)
 
             # Build section lookup
-            if chunk.section not in self.section_to_indices:
-                self.section_to_indices[chunk.section] = []
-            self.section_to_indices[chunk.section].append(idx)
+            if note.section not in self.section_to_indices:
+                self.section_to_indices[note.section] = []
+            self.section_to_indices[note.section].append(idx)
 
             # Build book lookup
-            if chunk.book_title not in self.book_to_indices:
-                self.book_to_indices[chunk.book_title] = []
-            self.book_to_indices[chunk.book_title].append(idx)
+            if note.book_title not in self.book_to_indices:
+                self.book_to_indices[note.book_title] = []
+            self.book_to_indices[note.book_title].append(idx)
 
     def search(
         self,
@@ -128,12 +128,12 @@ class VectorStore:
         filter_author: str | None = None,
         filter_section: str | None = None,
         filter_book: str | None = None,
-    ) -> list[tuple[TextChunk, float]]:
+    ) -> list[tuple[TextNote, float]]:
         """
-        Search for similar text chunks with optional pre-filtering.
+        Search for similar text notes with optional pre-filtering.
 
         Pre-filtering approach: Extract filtered embeddings, search only those,
-        then map back to original chunks. Much faster than post-filtering for
+        then map back to original notes. Much faster than post-filtering for
         selective filters.
 
         Args:
@@ -144,7 +144,7 @@ class VectorStore:
             filter_book: Optional book title to filter by (pre-filter)
 
         Returns:
-            List of (TextChunk, similarity_score) tuples, ordered by relevance
+            List of (TextNote, similarity_score) tuples, ordered by relevance
         """
         if self.index.ntotal == 0:
             return []
@@ -205,8 +205,8 @@ class VectorStore:
         # Gather results, skipping deleted indices
         results = []
         for idx, similarity in zip(original_indices, similarities, strict=True):
-            if 0 <= idx < len(self.chunks) and idx not in self.deleted_indices:
-                results.append((self.chunks[idx], float(similarity)))
+            if 0 <= idx < len(self.notes) and idx not in self.deleted_indices:
+                results.append((self.notes[idx], float(similarity)))
 
         return results
 
@@ -262,10 +262,10 @@ class VectorStore:
         index_path = directory / "faiss.index"
         faiss.write_index(self.index, str(index_path))
 
-        # Save chunks metadata
-        chunks_path = directory / "chunks.pkl"
-        with open(chunks_path, "wb") as f:
-            pickle.dump(self.chunks, f)
+        # Save notes metadata
+        notes_path = directory / "notes.pkl"
+        with open(notes_path, "wb") as f:
+            pickle.dump(self.notes, f)
 
         # Save lookup tables for fast loading
         lookups_path = directory / "lookups.pkl"
@@ -284,7 +284,7 @@ class VectorStore:
         metadata = {
             "dimension": self.dimension,
             "num_vectors": self.index.ntotal,
-            "num_chunks": len(self.chunks),
+            "num_notes": len(self.notes),
             "num_authors": len(self.author_to_indices),
             "num_sections": len(self.section_to_indices),
             "num_books": len(self.book_to_indices),
@@ -295,7 +295,7 @@ class VectorStore:
 
         logger.info(f"Saved filtered vector store to {directory}")
         logger.info(f"  - [bold]{self.index.ntotal}[/bold] vectors")
-        logger.info(f"  - [bold]{len(self.chunks)}[/bold] chunks")
+        logger.info(f"  - [bold]{len(self.notes)}[/bold] notes")
         logger.info(f"  - [bold]{len(self.author_to_indices)}[/bold] authors")
         logger.info(f"  - [bold]{len(self.section_to_indices)}[/bold] sections")
 
@@ -324,10 +324,10 @@ class VectorStore:
         index_path = directory / "faiss.index"
         store.index = faiss.read_index(str(index_path))
 
-        # Load chunks
-        chunks_path = directory / "chunks.pkl"
-        with open(chunks_path, "rb") as f:
-            store.chunks = pickle.load(f)
+        # Load notes
+        notes_path = directory / "notes.pkl"
+        with open(notes_path, "rb") as f:
+            store.notes = pickle.load(f)
 
         # Load lookup tables
         lookups_path = directory / "lookups.pkl"
@@ -342,7 +342,7 @@ class VectorStore:
 
         logger.info(f"Loaded filtered vector store from {directory}")
         logger.info(f"  - [bold]{store.index.ntotal}[/bold] vectors")
-        logger.info(f"  - [bold]{len(store.chunks)}[/bold] chunks")
+        logger.info(f"  - [bold]{len(store.notes)}[/bold] notes")
         logger.info(f"  - [bold]{len(store.author_to_indices)}[/bold] authors indexed")
 
         return store
@@ -350,7 +350,7 @@ class VectorStore:
     def get_stats(self) -> dict[str, Any]:
         """Get statistics about the vector store."""
         return {
-            "total_chunks": len(self.chunks),
+            "total_notes": len(self.notes),
             "total_vectors": self.index.ntotal,
             "dimension": self.dimension,
             "unique_authors": len(self.author_to_indices),
@@ -362,11 +362,11 @@ class VectorStore:
 
     def get_filter_info(self, author: str | None = None, section: str | None = None) -> dict:
         """
-        Get information about how many chunks match the given filters.
+        Get information about how many notes match the given filters.
 
         Useful for understanding filter selectivity before searching.
         """
-        total = len(self.chunks)
+        total = len(self.notes)
 
         if author:
             author_count = len(self.author_to_indices.get(author, []))
@@ -391,9 +391,9 @@ class VectorStore:
             filtered_count = total
 
         return {
-            "total_chunks": total,
-            "author_chunks": author_count if author else None,
-            "section_chunks": section_count if section else None,
-            "filtered_chunks": filtered_count,
+            "total_notes": total,
+            "author_notes": author_count if author else None,
+            "section_notes": section_count if section else None,
+            "filtered_notes": filtered_count,
             "reduction_percent": ((total - filtered_count) / total * 100) if total > 0 else 0,
         }
