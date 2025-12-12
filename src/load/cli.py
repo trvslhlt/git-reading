@@ -17,7 +17,7 @@ def cmd_migrate(args):
 
     if not index_dir.exists():
         print(f"Error: Index directory not found: {index_dir}")
-        print("Run 'make run-extract' first to create extraction files.")
+        print("Run 'extract readings' first to create extraction files.")
         sys.exit(1)
 
     if args.incremental:

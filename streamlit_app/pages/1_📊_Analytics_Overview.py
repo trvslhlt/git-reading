@@ -81,7 +81,7 @@ def main():
     if total_books == 0:
         st.warning(
             f"No books found in `{index_dir}`. Run the extract command first:\n\n"
-            "```bash\nmake run-extract\n```"
+            "```bash\nextract readings --notes-dir <path>\n```"
         )
         return
 

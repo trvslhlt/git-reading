@@ -134,31 +134,30 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
 
 1. **Extract your reading notes**
    ```bash
-   make run-extract
+   extract readings --notes-dir <path>
    ```
-   This creates `.tmp/index.json` from your markdown files.
+   This creates extraction files in `./data/index/` from your markdown files.
 
 2. **Migrate to database** (optional, for Database Explorer)
    ```bash
-   make run-migrate
+   load-db migrate --index-dir <path> --database <path>
    ```
-   This creates `.tmp/readings.db` from the index.
+   This creates a SQLite database from the extraction files.
 
 3. **Build search index** (optional, for Semantic Search)
    ```bash
-   make search-install  # Install dependencies
-   make run-search-build  # Build vector index
+   search build --index-dir <path> --output <path>
    ```
-   This creates `.tmp/vector_store/` for semantic search.
+   This creates a vector store for semantic search.
 
 ### Updating Data
 
 Whenever you add new reading notes:
 
 ```bash
-make run-extract          # Re-extract from markdown
-make run-migrate ARGS='--force'  # Update database
-make run-search-build     # Rebuild search index
+extract readings --notes-dir <path>              # Re-extract from markdown (incremental)
+load-db migrate --index-dir <path> --database <path> --incremental  # Update database
+search build --index-dir <path> --output <path> --incremental       # Update search index
 ```
 
 Then refresh this app to see the changes!
@@ -179,7 +178,7 @@ with col1:
         st.success("✅ Index JSON found")
     else:
         st.error("❌ Index JSON not found")
-        st.caption("Run `make run-extract`")
+        st.caption("Run `extract readings --notes-dir <path>`")
 
 with col2:
     db_exists = Path(".tmp/readings.db").exists()
@@ -187,7 +186,7 @@ with col2:
         st.success("✅ Database found")
     else:
         st.warning("⚠️ Database not found")
-        st.caption("Run `make run-migrate`")
+        st.caption("Run `load-db migrate --index-dir <path> --database <path>`")
 
 with col3:
     vector_exists = Path(".tmp/vector_store").exists()
@@ -195,4 +194,4 @@ with col3:
         st.success("✅ Search index found")
     else:
         st.warning("⚠️ Search index not found")
-        st.caption("Run `make run-search-build`")
+        st.caption("Run `search build --index-dir <path> --output <path>`")
