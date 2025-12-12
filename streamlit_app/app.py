@@ -91,7 +91,7 @@ View comprehensive statistics about your reading:
 Perfect for understanding your reading patterns.
 """
     )
-    if st.button("Go to Analytics →", use_container_width=True):
+    if st.button("Go to Analytics →", width="stretch"):
         st.switch_page("pages/1_📊_Analytics_Overview.py")
 
 with col2:
@@ -107,7 +107,7 @@ Find passages using AI-powered search:
 Perfect for finding that quote you remember.
 """
     )
-    if st.button("Go to Search →", use_container_width=True):
+    if st.button("Go to Search →", width="stretch"):
         st.switch_page("pages/2_🔍_Semantic_Search.py")
 
 with col3:
@@ -123,7 +123,7 @@ Query the SQLite database directly:
 Perfect for advanced analysis and exports.
 """
     )
-    if st.button("Go to Database →", use_container_width=True):
+    if st.button("Go to Database →", width="stretch"):
         st.switch_page("pages/3_🗄️_Database_Explorer.py")
 
 st.markdown("---")
