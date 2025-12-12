@@ -193,7 +193,7 @@ erDiagram
     AUTHORS ||--o{ BOOK_AUTHORS : writes
     BOOKS ||--o{ BOOK_GENRES : categorized
     GENRES ||--o{ BOOK_GENRES : tags
-    BOOKS ||--o{ CHUNKS : contains
+    BOOKS ||--o{ NOTES : contains
     AUTHORS ||--o{ AUTHOR_INFLUENCES : influences
 
     BOOKS {
@@ -220,7 +220,7 @@ erDiagram
         string author_role
     }
 
-    CHUNKS {
+    NOTES {
         int id PK
         int book_id FK
         string section

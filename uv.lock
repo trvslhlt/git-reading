@@ -376,22 +376,35 @@ test = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
+test-full = [
+    { name = "faiss-cpu" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "sentence-transformers" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "faiss-cpu", marker = "extra == 'search'", specifier = ">=1.7.4" },
+    { name = "faiss-cpu", marker = "extra == 'test-full'", specifier = ">=1.7.4" },
     { name = "numpy", marker = "extra == 'search'", specifier = ">=1.24.0" },
+    { name = "numpy", marker = "extra == 'test-full'", specifier = ">=1.24.0" },
     { name = "pandas", marker = "extra == 'streamlit'", specifier = ">=2.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0" },
+    { name = "pytest", marker = "extra == 'test-full'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0" },
+    { name = "pytest-cov", marker = "extra == 'test-full'", specifier = ">=4.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "sentence-transformers", marker = "extra == 'search'", specifier = ">=2.2.0" },
+    { name = "sentence-transformers", marker = "extra == 'test-full'", specifier = ">=2.2.0" },
     { name = "streamlit", marker = "extra == 'streamlit'", specifier = ">=1.28.0" },
     { name = "watchdog", marker = "extra == 'streamlit'", specifier = ">=6.0.0" },
 ]
-provides-extras = ["test", "dev", "streamlit", "search"]
+provides-extras = ["test", "test-full", "dev", "streamlit", "search"]
 
 [[package]]
 name = "gitdb"

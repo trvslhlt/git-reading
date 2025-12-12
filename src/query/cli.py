@@ -118,7 +118,7 @@ def cmd_stats(args):
     stats = store.get_stats()
 
     print("Vector Store Statistics:")
-    print(f"  Total chunks: {stats['total_chunks']}")
+    print(f"  Total notes: {stats['total_notes']}")
     print(f"  Total vectors: {stats['total_vectors']}")
     print(f"  Unique authors: {stats['unique_authors']}")
     print(f"  Unique books: {stats['unique_books']}")

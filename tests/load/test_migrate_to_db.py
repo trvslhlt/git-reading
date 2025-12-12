@@ -68,10 +68,10 @@ class TestMigrateFromJson:
         assert len(books_result) == 1
         assert books_result[0][0] == "Test Book"
 
-        # Check chunks table
-        cursor.execute("SELECT COUNT(*) FROM chunks")
-        chunk_count = cursor.fetchone()[0]
-        assert chunk_count == 3  # 2 notes + 1 excerpt
+        # Check notes table
+        cursor.execute("SELECT COUNT(*) FROM notes")
+        note_count = cursor.fetchone()[0]
+        assert note_count == 3  # 2 notes + 1 excerpt
 
         conn.close()
 
@@ -210,8 +210,8 @@ class TestMigrateFromJson:
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
 
-        # Check chunks by section
-        cursor.execute("SELECT section, COUNT(*) FROM chunks GROUP BY section")
+        # Check notes by section
+        cursor.execute("SELECT section, COUNT(*) FROM notes GROUP BY section")
         sections = dict(cursor.fetchall())
 
         assert sections["notes"] == 2
@@ -243,7 +243,7 @@ class TestMigrateFromJson:
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT faiss_index FROM chunks ORDER BY faiss_index")
+        cursor.execute("SELECT faiss_index FROM notes ORDER BY faiss_index")
         indices = [row[0] for row in cursor.fetchall()]
 
         # Should be 0, 1, 2, 3, 4
@@ -254,7 +254,7 @@ class TestMigrateFromJson:
     def test_migration_empty_sections(self, temp_json_file, temp_db_path):
         """Test migration with empty sections list.
 
-        Note: Current implementation only creates books/authors when chunks exist.
+        Note: Current implementation only creates books/authors when notes exist.
         Books with no content are not migrated to the database.
         """
         books = [
@@ -272,14 +272,14 @@ class TestMigrateFromJson:
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
 
-        # With no chunks, no books or authors are created
+        # With no notes, no books or authors are created
         cursor.execute("SELECT COUNT(*) FROM books")
         assert cursor.fetchone()[0] == 0
 
         cursor.execute("SELECT COUNT(*) FROM authors")
         assert cursor.fetchone()[0] == 0
 
-        cursor.execute("SELECT COUNT(*) FROM chunks")
+        cursor.execute("SELECT COUNT(*) FROM notes")
         assert cursor.fetchone()[0] == 0
 
         conn.close()
@@ -309,8 +309,8 @@ class TestVerifyMigration:
         result = verify_migration(temp_db_path, json_path)
         assert result is True
 
-    def test_verify_detects_missing_chunks(self, temp_json_file, temp_db_path):
-        """Test that verification detects if chunks are missing."""
+    def test_verify_detects_missing_notes(self, temp_json_file, temp_db_path):
+        """Test that verification detects if notes are missing."""
         books = [
             {
                 "title": "Book",
@@ -322,7 +322,7 @@ class TestVerifyMigration:
 
         json_path = temp_json_file(books)
 
-        # Create database but manually insert fewer chunks
+        # Create database but manually insert fewer notes
         create_database(temp_db_path)
         conn = sqlite3.connect(temp_db_path)
         cursor = conn.cursor()
@@ -345,9 +345,9 @@ class TestVerifyMigration:
             ("book-john-doe", "john-doe"),
         )
 
-        # Only insert 1 chunk instead of 2
+        # Only insert 1 note instead of 2
         cursor.execute(
-            "INSERT INTO chunks (book_id, section, excerpt, faiss_index) VALUES (?, ?, ?, ?)",
+            "INSERT INTO notes (book_id, section, excerpt, faiss_index) VALUES (?, ?, ?, ?)",
             ("book-john-doe", "notes", "Note 1", 0),
         )
 

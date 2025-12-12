@@ -11,7 +11,7 @@ from pathlib import Path
 from common.logger import get_logger
 from extract.replay import get_latest_extraction, get_new_extractions_since, replay_all_extractions
 from query.embeddings import EmbeddingModel
-from query.vector_store import TextChunk, VectorStore
+from query.vector_store import TextNote, VectorStore
 
 logger = get_logger(__name__)
 
@@ -42,11 +42,11 @@ def build_search_index(
     # Initialize embedding model
     model = EmbeddingModel(model_name=model_name)
 
-    # Extract text chunks
-    chunks: list[TextChunk] = []
+    # Extract text notes
+    notes: list[TextNote] = []
     texts: list[str] = []
 
-    logger.info("Extracting text chunks...")
+    logger.info("Extracting text notes...")
     for book in books:
         title = book.get("title", "Unknown")
         author_first_name = book.get("author_first_name", "")
@@ -65,7 +65,7 @@ def build_search_index(
                 if not item or not item.strip():
                     continue
 
-                chunk = TextChunk(
+                note = TextNote(
                     text=item,
                     book_title=title,
                     author_first_name=author_first_name,
@@ -74,13 +74,13 @@ def build_search_index(
                     source_file=source_file,
                     date_read=date_read,
                 )
-                chunks.append(chunk)
+                notes.append(note)
                 texts.append(item)
 
-    logger.info(f"Extracted [bold]{len(chunks)}[/bold] text chunks")
+    logger.info(f"Extracted [bold]{len(notes)}[/bold] text notes")
 
-    if not chunks:
-        logger.warning("No text chunks found. Make sure your index has content in sections.")
+    if not notes:
+        logger.warning("No text notes found. Make sure your index has content in sections.")
         return
 
     # Generate embeddings
@@ -90,7 +90,7 @@ def build_search_index(
     # Create vector store
     logger.info("Building vector store...")
     store = VectorStore(dimension=model.get_dimension())
-    store.add(embeddings, chunks)
+    store.add(embeddings, notes)
 
     # Save to disk
     output_dir = Path(output_dir)
@@ -108,7 +108,7 @@ def build_search_index(
 
     logger.info("\n[green]✓[/green] Search index built successfully!")
     logger.info(f"  Model: [bold]{model_name}[/bold]")
-    logger.info(f"  Chunks indexed: [bold]{len(chunks)}[/bold]")
+    logger.info(f"  Notes indexed: [bold]{len(notes)}[/bold]")
     logger.info(f"  Saved to: {output_dir}")
 
 
@@ -142,11 +142,11 @@ def build_search_index_from_extractions(
     # Initialize embedding model
     model = EmbeddingModel(model_name=model_name)
 
-    # Extract text chunks
-    chunks: list[TextChunk] = []
+    # Extract text notes
+    notes: list[TextNote] = []
     texts: list[str] = []
 
-    logger.info("Extracting text chunks...")
+    logger.info("Extracting text notes...")
     for item in items:
         # Filter by section if specified
         if sections_to_index and item.section not in sections_to_index:
@@ -156,7 +156,7 @@ def build_search_index_from_extractions(
         if not item.content or not item.content.strip():
             continue
 
-        chunk = TextChunk(
+        note = TextNote(
             text=item.content,
             book_title=item.book_title,
             author_first_name=item.author_first_name,
@@ -166,13 +166,13 @@ def build_search_index_from_extractions(
             date_read=item.date_read,
             item_id=item.item_id,
         )
-        chunks.append(chunk)
+        notes.append(note)
         texts.append(item.content)
 
-    logger.info(f"Extracted [bold]{len(chunks)}[/bold] text chunks")
+    logger.info(f"Extracted [bold]{len(notes)}[/bold] text notes")
 
-    if not chunks:
-        logger.warning("No text chunks found. Make sure your extractions have content.")
+    if not notes:
+        logger.warning("No text notes found. Make sure your extractions have content.")
         return
 
     # Generate embeddings
@@ -182,7 +182,7 @@ def build_search_index_from_extractions(
     # Create vector store
     logger.info("Building vector store...")
     store = VectorStore(dimension=model.get_dimension())
-    store.add(embeddings, chunks)
+    store.add(embeddings, notes)
 
     # Set checkpoint to latest extraction
     latest_extraction = get_latest_extraction(index_dir)
@@ -205,7 +205,7 @@ def build_search_index_from_extractions(
 
     logger.info("\n[green]✓[/green] Search index built successfully!")
     logger.info(f"  Model: [bold]{model_name}[/bold]")
-    logger.info(f"  Chunks indexed: [bold]{len(chunks)}[/bold]")
+    logger.info(f"  Notes indexed: [bold]{len(notes)}[/bold]")
     logger.info(f"  Saved to: {output_dir}")
 
 
@@ -268,7 +268,7 @@ def update_search_index_incremental(
 
             if item.operation == "add":
                 # Generate embedding and add to store
-                chunk = TextChunk(
+                note = TextNote(
                     text=item.content,
                     book_title=item.book_title,
                     author_first_name=item.author_first_name,
@@ -280,7 +280,7 @@ def update_search_index_incremental(
                 )
 
                 embedding = model.encode_single(item.content)
-                store.add(embedding.reshape(1, -1), [chunk])
+                store.add(embedding.reshape(1, -1), [note])
                 adds += 1
 
             elif item.operation == "update":
@@ -288,7 +288,7 @@ def update_search_index_incremental(
                 # (FAISS doesn't support in-place updates)
                 store.remove_by_item_id(item.item_id)
 
-                chunk = TextChunk(
+                note = TextNote(
                     text=item.content,
                     book_title=item.book_title,
                     author_first_name=item.author_first_name,
@@ -300,7 +300,7 @@ def update_search_index_incremental(
                 )
 
                 embedding = model.encode_single(item.content)
-                store.add(embedding.reshape(1, -1), [chunk])
+                store.add(embedding.reshape(1, -1), [note])
                 updates += 1
 
             elif item.operation == "delete":
@@ -318,8 +318,8 @@ def update_search_index_incremental(
     logger.info(f"  Adds: [bold]{adds}[/bold]")
     logger.info(f"  Updates: [bold]{updates}[/bold]")
     logger.info(f"  Deletes: [bold]{deletes}[/bold]")
-    logger.info(f"  Active chunks: [bold]{len(store.chunks) - len(store.deleted_indices)}[/bold]")
-    logger.info(f"  Deleted chunks: [bold]{len(store.deleted_indices)}[/bold]")
+    logger.info(f"  Active notes: [bold]{len(store.notes) - len(store.deleted_indices)}[/bold]")
+    logger.info(f"  Deleted notes: [bold]{len(store.deleted_indices)}[/bold]")
 
 
 def search_notes(
@@ -368,15 +368,15 @@ def search_notes(
 
     # Format results
     formatted_results = []
-    for chunk, score in results:
+    for note, score in results:
         result = {
-            "text": chunk.text,
+            "text": note.text,
             "similarity": score,
-            "book_title": chunk.book_title,
-            "author": chunk.author,
-            "section": chunk.section,
-            "source_file": chunk.source_file,
-            "date_read": chunk.date_read,
+            "book_title": note.book_title,
+            "author": note.author,
+            "section": note.section,
+            "source_file": note.source_file,
+            "date_read": note.date_read,
         }
         formatted_results.append(result)
 
