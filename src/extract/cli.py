@@ -4,6 +4,8 @@
 import argparse
 from pathlib import Path
 
+from common.constants import INDEX_DIR
+
 from .main import extract_full, extract_incremental
 
 
@@ -69,8 +71,8 @@ def main():
     readings_parser.add_argument(
         "--index-dir",
         type=Path,
-        default=Path("./index"),
-        help="Directory to write extraction files (default: ./index)",
+        default=INDEX_DIR,
+        help=f"Directory to write extraction files (default: {INDEX_DIR})",
     )
     readings_parser.add_argument(
         "--full",

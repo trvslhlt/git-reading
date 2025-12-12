@@ -10,12 +10,11 @@ def main():
     st.markdown("*Find similar passages using AI-powered semantic search*")
 
     # Check if vector store exists
-    vector_store_path = Path(".tmp/vector_store")
+    vector_store_path = Path("./data/vector_store")
     if not vector_store_path.exists():
         st.warning(
             "Vector store not found. Build the search index first:\n\n"
-            "```bash\nmake search-install  # Install dependencies\n"
-            "make run-search-build  # Build index\n```"
+            "```bash\nsearch build --index-dir <path> --output <path>\n```"
         )
         st.info(
             "💡 **What is semantic search?**\n\n"

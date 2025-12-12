@@ -64,7 +64,10 @@ def parse_extraction_filename(filename: str) -> tuple[datetime, str] | None:
 
 def find_latest_extraction(index_dir: Path) -> Path | None:
     """
-    Find most recent extraction file by parsing all filenames.
+    Find most recent extraction file using lexicographical ordering.
+
+    The filename format (extraction_YYYYMMDD_HHMMSS_hash) naturally sorts
+    chronologically, so we can simply sort by filename.
 
     Args:
         index_dir: Directory containing extraction files
@@ -81,33 +84,25 @@ def find_latest_extraction(index_dir: Path) -> Path | None:
     if not extraction_files:
         return None
 
-    # Parse timestamps and find latest
-    latest_file = None
-    latest_timestamp = None
+    # Sort by filename - lexicographical order matches chronological order
+    extraction_files.sort(key=lambda p: p.name)
 
-    for file_path in extraction_files:
-        parsed = parse_extraction_filename(file_path.name)
-        if parsed is None:
-            continue
-
-        timestamp, _ = parsed
-
-        if latest_timestamp is None or timestamp > latest_timestamp:
-            latest_timestamp = timestamp
-            latest_file = file_path
-
-    return latest_file
+    # Return the last (most recent) file
+    return extraction_files[-1]
 
 
 def list_extractions_chronological(index_dir: Path) -> list[Path]:
     """
-    List all extraction files in chronological order.
+    List all extraction files in chronological order using lexicographical ordering.
+
+    The filename format (extraction_YYYYMMDD_HHMMSS_hash) naturally sorts
+    chronologically, so we can simply sort by filename.
 
     Args:
         index_dir: Directory containing extraction files
 
     Returns:
-        List of paths sorted by timestamp (oldest first)
+        List of paths sorted by filename (oldest first)
     """
     if not index_dir.exists():
         return []
@@ -115,19 +110,5 @@ def list_extractions_chronological(index_dir: Path) -> list[Path]:
     # Find all extraction files
     extraction_files = list(index_dir.glob("extraction_*.json"))
 
-    # Parse timestamps and sort
-    files_with_timestamps: list[tuple[datetime, Path]] = []
-
-    for file_path in extraction_files:
-        parsed = parse_extraction_filename(file_path.name)
-        if parsed is None:
-            continue
-
-        timestamp, _ = parsed
-        files_with_timestamps.append((timestamp, file_path))
-
-    # Sort by timestamp
-    files_with_timestamps.sort(key=lambda x: x[0])
-
-    # Return just the paths
-    return [path for _, path in files_with_timestamps]
+    # Sort by filename - lexicographical order matches chronological order
+    return sorted(extraction_files, key=lambda p: p.name)

@@ -1,11 +1,18 @@
 """Analytics overview page - statistics and visualizations of reading notes."""
 
-import json
+import sys
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+from common.constants import INDEX_DIR
+from extract.replay import group_items_by_book, replay_all_extractions
 
 
 def get_author_name(book: dict) -> str:
@@ -17,32 +24,69 @@ def get_author_name(book: dict) -> str:
     return last_name or first_name or "Unknown"
 
 
-def load_index(index_path: Path) -> dict:
-    """Load the book index JSON file."""
-    if not index_path.exists():
+def load_from_extractions(index_dir: Path) -> dict:
+    """Load books from extraction files."""
+    if not index_dir.exists():
         return {"books": [], "total_books": 0}
-    with open(index_path) as f:
-        return json.load(f)
+
+    try:
+        # Replay all extractions to get current state
+        items = replay_all_extractions(index_dir)
+
+        if not items:
+            return {"books": [], "total_books": 0}
+
+        # Group by book
+        books_dict = group_items_by_book(items)
+
+        # Transform for visualization
+        books = []
+        for (title, first_name, last_name), book_items in books_dict.items():
+            # Group items by section
+            sections = defaultdict(list)
+            for item in book_items:
+                sections[item.section].append(item.content)
+
+            books.append(
+                {
+                    "title": title,
+                    "author_first_name": first_name,
+                    "author_last_name": last_name,
+                    "sections": dict(sections),
+                    "date_read": book_items[0].date_read,  # Same for all items in book
+                    "source_file": book_items[0].source_file,
+                }
+            )
+
+        return {"books": books, "total_books": len(books)}
+
+    except Exception as e:
+        st.error(f"Error loading extraction files: {e}")
+        return {"books": [], "total_books": 0}
 
 
 def main():
     st.title("📊 Analytics Overview")
     st.markdown("*Statistics and visualizations of your reading notes*")
 
-    # Get index path from session state (set in main app)
-    index_path = st.session_state.get("index_path", ".tmp/index.json")
+    # Get index directory from session state (set in main app)
+    index_dir = st.session_state.get("index_dir", str(INDEX_DIR))
+    index_dir_path = Path(index_dir)
 
-    # Load data
-    data = load_index(Path(index_path))
+    # Load from extraction files
+    data = load_from_extractions(index_dir_path)
     books = data.get("books", [])
     total_books = data.get("total_books", 0)
 
     if total_books == 0:
         st.warning(
-            f"No books found in `{index_path}`. Run the extract command first:\n\n"
-            "```bash\nmake run-extract\n```"
+            f"No books found in `{index_dir}`. Run the extract command first:\n\n"
+            "```bash\nextract readings --notes-dir <path>\n```"
         )
         return
+
+    # Show data source indicator
+    st.caption(f"📁 Data source: Extraction files from `{index_dir}`")
 
     # Overview metrics
     st.header("Overview")

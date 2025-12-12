@@ -42,9 +42,12 @@ def main():
     st.markdown("*Browse and query the SQLite reading notes database*")
 
     # Check if database exists
-    db_path = Path(".tmp/readings.db")
+    db_path = Path("./data/readings.db")
     if not db_path.exists():
-        st.warning("Database not found. Run the migration first:\n\n```bash\nmake run-migrate\n```")
+        st.warning(
+            "Database not found. Run the migration first:\n\n"
+            "```bash\nload-db migrate --index-dir <path> --database <path>\n```"
+        )
         st.info(
             "💡 **What is the database?**\n\n"
             "The SQLite database stores all your reading notes in a structured format "

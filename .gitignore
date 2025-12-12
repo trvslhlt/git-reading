@@ -160,3 +160,6 @@ Thumbs.db
 /.streamlit/
 **/.streamlit/secrets.toml
 **/.streamlit/credentials.toml
+
+# Local data files
+data/

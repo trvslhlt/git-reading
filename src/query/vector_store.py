@@ -31,6 +31,7 @@ class TextChunk:
     source_file: str
     date_read: str | None = None
     chunk_id: str | None = None
+    item_id: str | None = None  # For tracking across incremental updates
 
     @property
     def author(self) -> str:
@@ -71,6 +72,11 @@ class VectorStore:
         self.section_to_indices: dict[str, list[int]] = {}
         self.book_to_indices: dict[str, list[int]] = {}
 
+        # Track item_id to faiss_index mapping for incremental updates
+        self.item_id_to_index: dict[str, int] = {}
+        self.deleted_indices: set[int] = set()  # Track deleted items
+        self.checkpoint: str | None = None  # Last processed commit hash
+
     def add(self, embeddings: np.ndarray, chunks: list[TextChunk]):
         """
         Add embeddings and their associated chunks to the store.
@@ -95,6 +101,10 @@ class VectorStore:
         for i, chunk in enumerate(chunks):
             idx = start_idx + i
             self.chunks.append(chunk)
+
+            # Track item_id mapping if available
+            if chunk.item_id:
+                self.item_id_to_index[chunk.item_id] = idx
 
             # Build author lookup
             if chunk.author not in self.author_to_indices:
@@ -192,13 +202,51 @@ class VectorStore:
         # cosine_similarity = 1 - (L2_distance^2 / 2)
         similarities = 1 - (distances[0] ** 2 / 2)
 
-        # Gather results
+        # Gather results, skipping deleted indices
         results = []
         for idx, similarity in zip(original_indices, similarities, strict=True):
-            if 0 <= idx < len(self.chunks):
+            if 0 <= idx < len(self.chunks) and idx not in self.deleted_indices:
                 results.append((self.chunks[idx], float(similarity)))
 
         return results
+
+    def remove_by_item_id(self, item_id: str) -> bool:
+        """
+        Mark an item as deleted by item_id.
+
+        FAISS doesn't support true deletion, so we track deleted indices
+        and filter them out during search.
+
+        Args:
+            item_id: The item ID to mark as deleted
+
+        Returns:
+            True if item was found and marked as deleted
+        """
+        if item_id in self.item_id_to_index:
+            idx = self.item_id_to_index[item_id]
+            self.deleted_indices.add(idx)
+            # Note: We don't remove from item_id_to_index in case item is re-added
+            return True
+        return False
+
+    def set_checkpoint(self, commit_hash: str):
+        """
+        Set the checkpoint (last processed commit hash).
+
+        Args:
+            commit_hash: Git commit hash
+        """
+        self.checkpoint = commit_hash
+
+    def get_checkpoint(self) -> str | None:
+        """
+        Get the checkpoint (last processed commit hash).
+
+        Returns:
+            Last processed commit hash or None
+        """
+        return self.checkpoint
 
     def save(self, directory: Path):
         """
@@ -225,6 +273,9 @@ class VectorStore:
             "author_to_indices": self.author_to_indices,
             "section_to_indices": self.section_to_indices,
             "book_to_indices": self.book_to_indices,
+            "item_id_to_index": self.item_id_to_index,
+            "deleted_indices": self.deleted_indices,
+            "checkpoint": self.checkpoint,
         }
         with open(lookups_path, "wb") as f:
             pickle.dump(lookups, f)
@@ -285,6 +336,9 @@ class VectorStore:
             store.author_to_indices = lookups["author_to_indices"]
             store.section_to_indices = lookups["section_to_indices"]
             store.book_to_indices = lookups["book_to_indices"]
+            store.item_id_to_index = lookups.get("item_id_to_index", {})
+            store.deleted_indices = lookups.get("deleted_indices", set())
+            store.checkpoint = lookups.get("checkpoint")
 
         logger.info(f"Loaded filtered vector store from {directory}")
         logger.info(f"  - [bold]{store.index.ntotal}[/bold] vectors")

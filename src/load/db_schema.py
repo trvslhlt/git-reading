@@ -92,6 +92,7 @@ def create_database(db_path: str | Path) -> None:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS chunks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            item_id TEXT UNIQUE,
             book_id TEXT NOT NULL,
             section TEXT,
             excerpt TEXT NOT NULL,
@@ -99,6 +100,15 @@ def create_database(db_path: str | Path) -> None:
             faiss_index INTEGER NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+        )
+    """)
+
+    # Metadata table for tracking extraction checkpoints
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -117,6 +127,7 @@ def create_database(db_path: str | Path) -> None:
     # Create indexes for common queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_book_id ON chunks(book_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_faiss_index ON chunks(faiss_index)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_item_id ON chunks(item_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_book_authors_book_id ON book_authors(book_id)")
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id)"
