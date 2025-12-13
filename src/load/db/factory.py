@@ -42,11 +42,11 @@ class DatabaseConfig:
         if isinstance(self.db_type, str):
             try:
                 self.db_type = DatabaseType(self.db_type.lower())
-            except ValueError:
+            except ValueError as e:
                 raise ValueError(
                     f"Unsupported database type: {self.db_type}. "
                     f"Must be one of: {', '.join(t.value for t in DatabaseType)}"
-                )
+                ) from e
 
         # Validate type-specific configuration
         if self.db_type == DatabaseType.SQLITE:
