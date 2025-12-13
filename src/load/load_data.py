@@ -1,15 +1,16 @@
-"""Load data from extraction files to SQLite database.
+"""Load data from extraction files to database.
 
-This module loads data from extraction files into a relational SQLite database
-while supporting incremental updates.
+This module loads data from extraction files into a relational database
+while supporting incremental updates. It uses the database abstraction layer
+to support both SQLite and PostgreSQL.
 """
 
 import json
-import sqlite3
 from pathlib import Path
 
 from common.logger import get_logger
 from extract.replay import get_latest_extraction, get_new_extractions_since, replay_all_extractions
+from load.db import DatabaseAdapter, IntegrityError
 from load.db_schema import create_database, get_connection
 
 from .db_utils import generate_author, generate_author_id, generate_book_id
@@ -17,40 +18,39 @@ from .db_utils import generate_author, generate_author_id, generate_book_id
 logger = get_logger(__name__)
 
 
-def get_checkpoint(conn: sqlite3.Connection) -> str | None:
+def get_checkpoint(adapter: DatabaseAdapter) -> str | None:
     """Get last processed commit hash from database.
 
     Args:
-        conn: Database connection
+        adapter: Database adapter
 
     Returns:
         Last processed commit hash or None if not found
     """
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM metadata WHERE key = 'last_processed_commit'")
-    row = cursor.fetchone()
-    return row[0] if row else None
+    result = adapter.fetchone(
+        "SELECT value FROM metadata WHERE key = ?", ("last_processed_commit",)
+    )
+    return result["value"] if result else None
 
 
-def store_checkpoint(conn: sqlite3.Connection, commit_hash: str) -> None:
+def store_checkpoint(adapter: DatabaseAdapter, commit_hash: str) -> None:
     """Store last processed commit hash in database.
 
     Args:
-        conn: Database connection
+        adapter: Database adapter
         commit_hash: Git commit hash to store
     """
-    cursor = conn.cursor()
-    cursor.execute(
+    adapter.execute(
         """
         INSERT INTO metadata (key, value)
-        VALUES ('last_processed_commit', ?)
+        VALUES (?, ?)
         ON CONFLICT(key) DO UPDATE SET
             value=excluded.value,
             updated_at=CURRENT_TIMESTAMP
         """,
-        (commit_hash,),
+        ("last_processed_commit", commit_hash),
     )
-    conn.commit()
+    adapter.commit()
 
 
 def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
@@ -107,8 +107,7 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
     create_database(db_path)
 
     # Connect and load
-    conn = get_connection(db_path)
-    cursor = conn.cursor()
+    adapter = get_connection(db_path)
 
     # Track unique books and authors
     books_seen: dict[str, dict] = {}
@@ -136,7 +135,7 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
         # Insert author if not seen
         if author not in authors_seen:
             try:
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO authors (id, first_name, last_name, name)
                     VALUES (?, ?, ?, ?)
@@ -147,14 +146,14 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
                     (author_id, author_first_name, author_last_name, author),
                 )
                 authors_seen[author] = author_id
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 # Author already exists
                 authors_seen[author] = author_id
 
         # Insert book if not seen
         if book_id not in books_seen:
             try:
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO books (id, title)
                     VALUES (?, ?)
@@ -165,7 +164,7 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
                 books_seen[book_id] = {"title": title, "author": author}
 
                 # Link book to author
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO book_authors (book_id, author_id)
                     VALUES (?, ?)
@@ -173,12 +172,12 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
                 """,
                     (book_id, author_id),
                 )
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 # Book already exists
                 pass
 
         # Insert note
-        cursor.execute(
+        adapter.execute(
             """
             INSERT INTO notes (book_id, section, excerpt, faiss_index)
             VALUES (?, ?, ?, ?)
@@ -189,25 +188,25 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
         if verbose and (i + 1) % 500 == 0:
             logger.debug(f"  Processed {i + 1}/{len(notes)} notes...")
 
-    conn.commit()
+    adapter.commit()
 
     # Print summary
     if verbose:
-        cursor.execute("SELECT COUNT(*) FROM books")
-        book_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM books")
+        book_count = result[list(result.keys())[0]]
 
-        cursor.execute("SELECT COUNT(*) FROM authors")
-        author_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
+        author_count = result[list(result.keys())[0]]
 
-        cursor.execute("SELECT COUNT(*) FROM notes")
-        note_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
+        note_count = result[list(result.keys())[0]]
 
         logger.info("\n[green]✓[/green] Load complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
         logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
-    conn.close()
+    adapter.close()
 
 
 def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
@@ -244,8 +243,7 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
     create_database(db_path)
 
     # Connect and load
-    conn = get_connection(db_path)
-    cursor = conn.cursor()
+    adapter = get_connection(db_path)
 
     # Track unique books and authors
     books_seen: dict[str, dict] = {}
@@ -270,7 +268,7 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
         # Insert author if not seen
         if author not in authors_seen:
             try:
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO authors (id, first_name, last_name, name)
                     VALUES (?, ?, ?, ?)
@@ -281,14 +279,14 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
                     (author_id, author_first_name, author_last_name, author),
                 )
                 authors_seen[author] = author_id
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 # Author already exists
                 authors_seen[author] = author_id
 
         # Insert book if not seen
         if book_id not in books_seen:
             try:
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO books (id, title)
                     VALUES (?, ?)
@@ -299,7 +297,7 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
                 books_seen[book_id] = {"title": title, "author": author}
 
                 # Link book to author
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO book_authors (book_id, author_id)
                     VALUES (?, ?)
@@ -307,12 +305,12 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
                 """,
                     (book_id, author_id),
                 )
-            except sqlite3.IntegrityError:
+            except IntegrityError:
                 # Book already exists
                 pass
 
         # Insert note with item_id
-        cursor.execute(
+        adapter.execute(
             """
             INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
             VALUES (?, ?, ?, ?, ?)
@@ -326,27 +324,27 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
     # Store checkpoint (get latest extraction's commit hash)
     latest_extraction = get_latest_extraction(index_dir)
     if latest_extraction:
-        store_checkpoint(conn, latest_extraction.extraction_metadata.git_commit_hash)
+        store_checkpoint(adapter, latest_extraction.extraction_metadata.git_commit_hash)
 
-    conn.commit()
+    adapter.commit()
 
     # Print summary
     if verbose:
-        cursor.execute("SELECT COUNT(*) FROM books")
-        book_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM books")
+        book_count = result[list(result.keys())[0]]
 
-        cursor.execute("SELECT COUNT(*) FROM authors")
-        author_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
+        author_count = result[list(result.keys())[0]]
 
-        cursor.execute("SELECT COUNT(*) FROM notes")
-        note_count = cursor.fetchone()[0]
+        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
+        note_count = result[list(result.keys())[0]]
 
         logger.info("\n[green]✓[/green] Load complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
         logger.info(f"  Authors: [bold]{author_count}[/bold]")
         logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
-    conn.close()
+    adapter.close()
 
 
 def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
@@ -367,12 +365,12 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
         raise ValueError(f"Database not found: {db_path}. Run full load first.")
 
     # Connect to database
-    conn = get_connection(db_path)
+    adapter = get_connection(db_path)
 
     # Get last processed commit
-    last_commit = get_checkpoint(conn)
+    last_commit = get_checkpoint(adapter)
     if not last_commit:
-        conn.close()
+        adapter.close()
         raise ValueError("No checkpoint found in database. Run full load first.")
 
     if verbose:
@@ -384,13 +382,11 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
     if not new_extractions:
         if verbose:
             logger.info("[green]✓[/green] No new extractions to process")
-        conn.close()
+        adapter.close()
         return
 
     if verbose:
         logger.info(f"Found [bold]{len(new_extractions)}[/bold] new extraction(s)")
-
-    cursor = conn.cursor()
 
     # Track stats
     adds = 0
@@ -411,7 +407,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
             if item.operation == "add":
                 # Ensure author exists
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO authors (id, first_name, last_name, name)
                     VALUES (?, ?, ?, ?)
@@ -421,7 +417,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
                 )
 
                 # Ensure book exists
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO books (id, title)
                     VALUES (?, ?)
@@ -431,7 +427,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
                 )
 
                 # Link book to author
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO book_authors (book_id, author_id)
                     VALUES (?, ?)
@@ -441,12 +437,12 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
                 )
 
                 # Get next faiss_index
-                cursor.execute("SELECT MAX(faiss_index) FROM notes")
-                max_index = cursor.fetchone()[0]
+                result = adapter.fetchone("SELECT MAX(faiss_index) FROM notes")
+                max_index = result[list(result.keys())[0]] if result else None
                 next_index = (max_index + 1) if max_index is not None else 0
 
                 # Insert new note
-                cursor.execute(
+                adapter.execute(
                     """
                     INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
                     VALUES (?, ?, ?, ?, ?)
@@ -457,7 +453,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
             elif item.operation == "update":
                 # Update existing note
-                cursor.execute(
+                adapter.execute(
                     """
                     UPDATE notes
                     SET section = ?, excerpt = ?
@@ -469,13 +465,13 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
             elif item.operation == "delete":
                 # Delete note
-                cursor.execute("DELETE FROM notes WHERE item_id = ?", (item.item_id,))
+                adapter.execute("DELETE FROM notes WHERE item_id = ?", (item.item_id,))
                 deletes += 1
 
         # Update checkpoint after each extraction
-        store_checkpoint(conn, extraction.extraction_metadata.git_commit_hash)
+        store_checkpoint(adapter, extraction.extraction_metadata.git_commit_hash)
 
-    conn.commit()
+    adapter.commit()
 
     if verbose:
         logger.info("\n[green]✓[/green] Incremental load complete!")
@@ -483,7 +479,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
         logger.info(f"  Updates: [bold]{updates}[/bold]")
         logger.info(f"  Deletes: [bold]{deletes}[/bold]")
 
-    conn.close()
+    adapter.close()
 
 
 def verify_load(db_path: str | Path, json_path: str | Path) -> bool:
@@ -509,16 +505,15 @@ def verify_load(db_path: str | Path, json_path: str | Path) -> bool:
                 json_note_count += len(excerpts)
 
     # Check DB
-    conn = get_connection(db_path)
-    cursor = conn.cursor()
+    adapter = get_connection(db_path)
 
-    cursor.execute("SELECT COUNT(*) FROM notes")
-    db_note_count = cursor.fetchone()[0]
+    result = adapter.fetchone("SELECT COUNT(*) FROM notes")
+    db_note_count = result[list(result.keys())[0]]
 
-    cursor.execute("SELECT faiss_index FROM notes ORDER BY faiss_index")
-    faiss_indices = [row[0] for row in cursor.fetchall()]
+    rows = adapter.fetchall("SELECT faiss_index FROM notes ORDER BY faiss_index")
+    faiss_indices = [row["faiss_index"] for row in rows]
 
-    conn.close()
+    adapter.close()
 
     # Verify
     if json_note_count != db_note_count:
