@@ -4,8 +4,9 @@
 .PHONY: help install test test-cov test-cov-report lint format clean \
 	run-extract run-load run-validate run-fix run-learn-patterns \
 	run-search-build run-search-query run-search-stats run-streamlit \
-	dev-install streamlit-install search-install \
-	streamlit search dev
+	dev-install streamlit-install search-install postgres-install \
+	streamlit search dev \
+	postgres-up postgres-down postgres-logs postgres-status postgres-psql postgres-clean
 
 #
 # Help
@@ -24,6 +25,7 @@ help:
 	@echo "  make dev-install         - Install with dev dependencies (testing, linting)"
 	@echo "  make streamlit-install   - Install with Streamlit visualization dependencies"
 	@echo "  make search-install      - Install with semantic search dependencies"
+	@echo "  make postgres-install    - Install with PostgreSQL dependencies"
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  make test                - Run all tests with pytest"
@@ -47,6 +49,14 @@ help:
 	@echo ""
 	@echo "Visualization:"
 	@echo "  make run-streamlit       - Launch Streamlit app (requires: make streamlit-install)"
+	@echo ""
+	@echo "PostgreSQL/Docker Commands:"
+	@echo "  make postgres-up         - Start PostgreSQL in Docker container"
+	@echo "  make postgres-down       - Stop PostgreSQL container"
+	@echo "  make postgres-logs       - View PostgreSQL container logs"
+	@echo "  make postgres-status     - Check PostgreSQL container status"
+	@echo "  make postgres-psql       - Open PostgreSQL CLI (psql)"
+	@echo "  make postgres-clean      - Stop and remove PostgreSQL container and volumes"
 	@echo ""
 	@echo "Common Workflows:"
 	@echo "  # Extract notes (incremental) and build search index"
@@ -91,6 +101,10 @@ streamlit-install:
 search-install:
 	@echo "Installing with semantic search dependencies..."
 	uv pip install -e ".[search]"
+
+postgres-install:
+	@echo "Installing with PostgreSQL dependencies..."
+	uv pip install -e ".[postgresql]"
 
 #
 # Quick Start Workflows (auto-install dependencies)
@@ -290,3 +304,62 @@ run-search-stats:
 run-streamlit:
 	@echo "Launching Streamlit app at http://localhost:8501..."
 	uv run streamlit run streamlit_app/app.py
+
+#
+# PostgreSQL/Docker Management
+#
+
+# Start PostgreSQL container
+# The container will be created if it doesn't exist
+# Uses settings from .env file (or .env.example defaults)
+postgres-up:
+	@echo "Starting PostgreSQL container..."
+	@if [ ! -f .env ]; then \
+		echo "No .env file found. Copy .env.example to .env and customize if needed."; \
+		echo "Using defaults from .env.example..."; \
+	fi
+	docker compose up -d postgres
+	@echo "Waiting for PostgreSQL to be ready..."
+	@timeout 30 sh -c 'until docker compose exec postgres pg_isready -U $${POSTGRES_USER:-git_reading_user} -d $${POSTGRES_DB:-git_reading} > /dev/null 2>&1; do sleep 1; done' || \
+		(echo "PostgreSQL failed to start within 30 seconds. Check logs with: make postgres-logs" && exit 1)
+	@echo "PostgreSQL is ready!"
+	@docker compose ps postgres
+
+# Stop PostgreSQL container (preserves data in volume)
+postgres-down:
+	@echo "Stopping PostgreSQL container..."
+	docker compose down postgres
+
+# View PostgreSQL container logs
+# Use Ctrl+C to exit
+postgres-logs:
+	docker compose logs -f postgres
+
+# Check PostgreSQL container status and health
+postgres-status:
+	@echo "PostgreSQL container status:"
+	@docker compose ps postgres
+	@echo ""
+	@echo "PostgreSQL health check:"
+	@docker compose exec postgres pg_isready -U $${POSTGRES_USER:-git_reading_user} -d $${POSTGRES_DB:-git_reading} || echo "PostgreSQL is not ready"
+
+# Open PostgreSQL CLI (psql)
+# Usage: make postgres-psql
+# Once inside, you can run SQL commands, \dt to list tables, \q to quit
+postgres-psql:
+	@echo "Connecting to PostgreSQL..."
+	@echo "Tip: Use \\dt to list tables, \\d table_name to describe a table, \\q to quit"
+	docker compose exec postgres psql -U $${POSTGRES_USER:-git_reading_user} -d $${POSTGRES_DB:-git_reading}
+
+# Stop and remove PostgreSQL container and volumes (deletes all data!)
+postgres-clean:
+	@echo "WARNING: This will delete all PostgreSQL data!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [ "$$REPLY" = "y" ] || [ "$$REPLY" = "Y" ]; then \
+		echo "Stopping and removing PostgreSQL container and volumes..."; \
+		docker compose down -v postgres; \
+		echo "PostgreSQL data has been deleted."; \
+	else \
+		echo "Cancelled."; \
+	fi

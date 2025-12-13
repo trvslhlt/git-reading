@@ -35,6 +35,8 @@ class DatabaseConfig:
     database: str | None = None
     user: str | None = None
     password: str | None = None
+    pool_size: int = 5
+    pool_max_overflow: int = 10
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -113,6 +115,8 @@ def create_database(config: DatabaseConfig) -> DatabaseAdapter:
             database=config.database,
             user=config.user,
             password=config.password,
+            pool_size=config.pool_size,
+            pool_max_overflow=config.pool_max_overflow,
         )
 
     else:
