@@ -19,9 +19,22 @@ This tool scans markdown files containing book notes and extracts structured inf
 
 ```bash
 make install
+make postgres-install  # Install PostgreSQL dependencies (default backend)
 ```
 
 ### Quick Start
+
+#### Database Setup (PostgreSQL)
+
+```bash
+# Start PostgreSQL via Docker
+make postgres-up
+
+# Create .env file (optional - defaults work for local development)
+cp .env.example .env
+```
+
+#### Extract and Load Data
 
 ```bash
 # Extract reading notes (incremental by default)
@@ -48,6 +61,14 @@ make run-search-query ARGS='"meaning of life"'
 ```
 
 See [docs/SEMANTIC_SEARCH.md](docs/SEMANTIC_SEARCH.md) for architecture and advanced features.
+
+### Database Backends
+
+Git-reading supports two database backends:
+- **PostgreSQL** (default): Production-ready with connection pooling
+- **SQLite**: Simple file-based fallback
+
+Set `DATABASE_TYPE=sqlite` in `.env` to use SQLite instead. See [docs/DATABASE.md](docs/DATABASE.md) for details.
 
 ### Visualization
 

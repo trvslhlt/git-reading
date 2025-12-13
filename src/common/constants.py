@@ -10,7 +10,7 @@ VECTOR_STORE_DIR = DATA_DIR / "vector_store"
 DATABASE_PATH = DATA_DIR / "readings.db"
 
 # Database configuration (can be overridden by environment variables)
-DATABASE_TYPE = os.getenv("DATABASE_TYPE", "sqlite")
+DATABASE_TYPE = os.getenv("DATABASE_TYPE", "postgresql")
 
 # SQLite configuration (used when DATABASE_TYPE=sqlite)
 SQLITE_DATABASE_PATH = Path(os.getenv("DATABASE_PATH", str(DATABASE_PATH)))

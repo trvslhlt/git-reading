@@ -1,10 +1,19 @@
 # Database Loading Guide
 
-This guide explains how to load data from extraction files into SQLite database storage.
+This guide explains how to load data from extraction files into database storage.
+
+## Database Backend Support
+
+Git-reading supports two database backends:
+
+- **PostgreSQL** (default): Production-ready, scalable, with connection pooling
+- **SQLite**: Simple, file-based, zero-configuration fallback
+
+Both backends provide the same functionality through a unified adapter interface.
 
 ## Why Use a Database?
 
-The SQLite database provides several advantages over the single JSON file:
+Database storage provides several advantages over JSON files:
 
 1. **Structured Queries**: Use SQL to query books, authors, genres, and relationships
 2. **Better Performance**: Indexed lookups for filtering and joins
@@ -34,19 +43,84 @@ The database includes the following tables:
 - Hierarchical genre taxonomy (parent_id)
 - Ready for enrichment with external metadata
 
+## Choosing a Database Backend
+
+### PostgreSQL (Default)
+
+PostgreSQL provides better performance and scalability.
+
+#### Setup
+
+1. **Start PostgreSQL** (via Docker):
+   ```bash
+   make postgres-up
+   ```
+
+2. **Install PostgreSQL dependencies**:
+   ```bash
+   make postgres-install
+   ```
+
+3. **Configure environment variables** (create a `.env` file):
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` if needed (defaults are fine for local development):
+   ```bash
+   DATABASE_TYPE=postgresql  # Default
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+   POSTGRES_DB=git_reading
+   POSTGRES_USER=git_reading_user
+   POSTGRES_PASSWORD=dev_password
+   ```
+
+4. **Load data**:
+   ```bash
+   make run-load ARGS='--index-dir data/index --database readings'
+   ```
+
+#### Docker Commands
+
+```bash
+make postgres-up       # Start PostgreSQL container
+make postgres-down     # Stop PostgreSQL (preserves data)
+make postgres-logs     # View container logs
+make postgres-status   # Check health
+make postgres-psql     # Open PostgreSQL CLI
+make postgres-clean    # Remove container and data (with confirmation)
+```
+
+### SQLite (Fallback)
+
+SQLite requires no setup and works out of the box:
+
+```bash
+# Switch to SQLite
+export DATABASE_TYPE=sqlite
+make run-load ARGS='--index-dir data/index --database data/readings.db'
+```
+
+No dependencies needed - just specify the database file path.
+
 ## Loading Process
 
 ### Step 1: Load the Data
 
 ```bash
-# Load with default paths
+# PostgreSQL (default)
+make run-load ARGS='--index-dir data/index --database readings'
+
+# SQLite (if DATABASE_TYPE=sqlite is set)
+export DATABASE_TYPE=sqlite
 make run-load ARGS='--index-dir data/index --database data/readings.db'
 
 # Force overwrite existing database
-make run-load ARGS='--index-dir data/index --database data/readings.db --force'
+make run-load ARGS='--index-dir data/index --database readings --force'
 
 # Incremental update
-make run-load ARGS='--index-dir data/index --database data/readings.db --incremental'
+make run-load ARGS='--index-dir data/index --database readings --incremental'
 ```
 
 ### Step 2: Verify Load
