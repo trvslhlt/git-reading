@@ -5,13 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from load.db import (
-    DatabaseConfig,
-    IntegrityError,
-    SQLiteAdapter,
-    create_database,
-)
+from load.db import DatabaseConfig, IntegrityError, create_database
 from load.db.postgres_adapter import PostgreSQLAdapter
+from load.db.sqlite_adapter import SQLiteAdapter
 
 # Skip PostgreSQL integration tests unless explicitly enabled
 # (These tests require a running PostgreSQL instance)
@@ -205,6 +201,61 @@ class TestSQLiteAdapter:
 
         adapter.close()
 
+    def test_exists_method(self, tmp_path):
+        """Test exists() method."""
+        db_path = tmp_path / "test.db"
+        adapter = SQLiteAdapter(db_path)
+
+        # Database file doesn't exist yet
+        assert not adapter.exists()
+
+        # Create the database
+        adapter.connect()
+        adapter.create_schema()
+        adapter.close()
+
+        # Now it should exist
+        assert adapter.exists()
+
+    def test_delete_method(self, tmp_path):
+        """Test delete() method."""
+        db_path = tmp_path / "test.db"
+        adapter = SQLiteAdapter(db_path)
+        adapter.connect()
+        adapter.create_schema()
+        adapter.close()
+
+        # Database exists
+        assert adapter.exists()
+
+        # Delete it
+        adapter.delete()
+
+        # Should no longer exist
+        assert not adapter.exists()
+
+    def test_drop_schema_method(self, tmp_path):
+        """Test drop_schema() method."""
+        db_path = tmp_path / "test.db"
+        adapter = SQLiteAdapter(db_path)
+        adapter.connect()
+        adapter.create_schema()
+
+        # Verify tables exist
+        tables = adapter.get_tables()
+        tables = [t for t in tables if t != "sqlite_sequence"]
+        assert len(tables) > 0
+
+        # Drop all tables
+        adapter.drop_schema()
+
+        # Verify tables are gone
+        tables = adapter.get_tables()
+        tables = [t for t in tables if t != "sqlite_sequence"]
+        assert len(tables) == 0
+
+        adapter.close()
+
 
 class TestDatabaseFactory:
     """Tests for database factory."""
@@ -241,6 +292,61 @@ class TestDatabaseFactory:
         """Test that config converts string paths to Path objects."""
         config = DatabaseConfig(db_type="sqlite", db_path="test.db")
         assert isinstance(config.db_path, Path)
+
+    def test_get_adapter_sqlite(self, monkeypatch, tmp_path):
+        """Test get_adapter() creates SQLite adapter from env."""
+        from load.db import get_adapter
+
+        monkeypatch.setenv("DATABASE_TYPE", "sqlite")
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "test.db"))
+
+        adapter = get_adapter()
+        assert isinstance(adapter, SQLiteAdapter)
+
+    def test_get_adapter_sqlite_with_override(self, monkeypatch, tmp_path):
+        """Test get_adapter() with explicit db_identifier override."""
+        from load.db import get_adapter
+
+        monkeypatch.setenv("DATABASE_TYPE", "sqlite")
+        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "default.db"))
+
+        # Override with custom path
+        adapter = get_adapter(tmp_path / "custom.db")
+        assert isinstance(adapter, SQLiteAdapter)
+        assert adapter.db_path == tmp_path / "custom.db"
+
+    def test_get_adapter_postgresql(self, monkeypatch):
+        """Test get_adapter() creates PostgreSQL adapter from env."""
+        pytest.importorskip("psycopg")
+
+        from load.db import get_adapter
+
+        monkeypatch.setenv("DATABASE_TYPE", "postgresql")
+        monkeypatch.setenv("POSTGRES_HOST", "localhost")
+        monkeypatch.setenv("POSTGRES_PORT", "5432")
+        monkeypatch.setenv("POSTGRES_DB", "test_db")
+        monkeypatch.setenv("POSTGRES_USER", "test_user")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "test_pass")
+
+        adapter = get_adapter()
+        assert isinstance(adapter, PostgreSQLAdapter)
+
+    def test_get_adapter_postgresql_with_override(self, monkeypatch):
+        """Test get_adapter() with explicit database name override."""
+        pytest.importorskip("psycopg")
+
+        from load.db import get_adapter
+
+        monkeypatch.setenv("DATABASE_TYPE", "postgresql")
+        monkeypatch.setenv("POSTGRES_HOST", "localhost")
+        monkeypatch.setenv("POSTGRES_PORT", "5432")
+        monkeypatch.setenv("POSTGRES_DB", "default_db")
+        monkeypatch.setenv("POSTGRES_USER", "test_user")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "test_pass")
+
+        # Override with custom database name
+        adapter = get_adapter("custom_db")
+        assert isinstance(adapter, PostgreSQLAdapter)
 
 
 @pytest.mark.skipif(
