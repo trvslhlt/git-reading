@@ -61,6 +61,7 @@ def cmd_load(args):
             # Check if tables already exist (unless force is specified)
             if not args.force:
                 from load.db_schema import get_connection
+
                 adapter = get_connection(database)
                 tables = adapter.get_tables()
                 adapter.close()

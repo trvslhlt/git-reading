@@ -247,6 +247,7 @@ def load_from_extractions(
     # For PostgreSQL with force flag, drop existing tables first
     if force:
         from common.env import env
+
         if env.database_type().lower() == "postgresql":
             adapter = get_connection(db_path)
             adapter.drop_schema()
@@ -375,6 +376,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
     # Check if database exists
     from common.env import env
+
     db_type = env.database_type()
 
     if db_type.lower() == "sqlite":

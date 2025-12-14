@@ -215,10 +215,10 @@ with col2:
             tables = adapter.get_tables()
             adapter.close()
             db_exists = len(tables) > 0
-            db_label = f"Database (PostgreSQL)"
+            db_label = "Database (PostgreSQL)"
         except Exception:
             db_exists = False
-            db_label = f"Database (PostgreSQL)"
+            db_label = "Database (PostgreSQL)"
 
     if db_exists:
         st.success(f"✅ {db_label} found")
