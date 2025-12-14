@@ -172,6 +172,20 @@ class PostgreSQLAdapter(DatabaseAdapter):
         except psycopg.Error as e:
             raise SchemaError(f"Failed to drop schema: {e}") from e
 
+    def exists(self) -> bool:
+        """Check if PostgreSQL database exists and has tables."""
+        try:
+            self.connect()
+            tables = self.get_tables()
+            self.close()
+            return len(tables) > 0
+        except Exception:
+            return False
+
+    def delete(self) -> None:
+        """Drop all tables in PostgreSQL database."""
+        self.drop_schema()  # Already implemented
+
     def get_tables(self) -> list[str]:
         """Get list of all tables in database."""
         if not self._conn:

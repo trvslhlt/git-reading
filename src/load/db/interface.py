@@ -161,6 +161,42 @@ class DatabaseAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    def exists(self) -> bool:
+        """Check if database exists and is accessible.
+
+        For SQLite: Checks if database file exists
+        For PostgreSQL: Checks if database exists and has tables
+
+        Returns:
+            True if database exists and is accessible, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    def delete(self) -> None:
+        """Delete/drop the database.
+
+        For SQLite: Deletes the database file
+        For PostgreSQL: Drops all tables (CASCADE)
+
+        Raises:
+            DatabaseError: If deletion fails
+        """
+        pass
+
+    @abstractmethod
+    def drop_schema(self) -> None:
+        """Drop all tables in the database.
+
+        Similar to delete() but doesn't remove the database itself.
+        Already implemented in PostgreSQLAdapter, needs SQLite implementation.
+
+        Raises:
+            SchemaError: If schema drop fails
+        """
+        pass
+
     def __enter__(self):
         """Context manager entry."""
         self.connect()

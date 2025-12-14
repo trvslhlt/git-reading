@@ -5,7 +5,6 @@ while supporting incremental updates. It uses the database abstraction layer
 to support both SQLite and PostgreSQL.
 """
 
-import json
 from pathlib import Path
 
 from common.logger import get_logger
@@ -16,6 +15,14 @@ from load.db_schema import create_database, get_connection
 from .db_utils import generate_author, generate_author_id, generate_book_id
 
 logger = get_logger(__name__)
+
+
+def _set_log_level(verbose: bool) -> None:
+    """Set logger level based on verbose flag."""
+    if verbose:
+        logger.setLevel("INFO")
+    else:
+        logger.setLevel("WARNING")
 
 
 def get_checkpoint(adapter: DatabaseAdapter) -> str | None:
@@ -53,217 +60,53 @@ def store_checkpoint(adapter: DatabaseAdapter, commit_hash: str) -> None:
     adapter.commit()
 
 
-def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = True) -> None:
-    """Load data from index.json to SQLite database.
-
-    Args:
-        json_path: Path to index.json file
-        db_path: Path to SQLite database file
-        verbose: Print progress messages
-    """
-    json_path = Path(json_path)
-    db_path = Path(db_path)
-
-    if not json_path.exists():
-        raise FileNotFoundError(f"Index file not found: {json_path}")
-
-    # Load JSON data
-    if verbose:
-        logger.info(f"Loading data from {json_path}...")
-    with open(json_path) as f:
-        data = json.load(f)
-
-    books = data.get("books", [])
-    if verbose:
-        logger.info(f"Found [bold]{len(books)}[/bold] books")
-
-    # Flatten books into notes
-    notes = []
-    for book in books:
-        title = book.get("title", "Unknown")
-        first_name = book.get("author_first_name", "Unknown")
-        last_name = book.get("author_last_name", "Unknown")
-        sections_data = book.get("sections", {})
-
-        for section_name, excerpts in sections_data.items():
-            if isinstance(excerpts, list):
-                for excerpt in excerpts:
-                    notes.append(
-                        {
-                            "title": title,
-                            "author_first_name": first_name,
-                            "author_last_name": last_name,
-                            "section": section_name,
-                            "excerpt": excerpt,
-                        }
-                    )
-
-    if verbose:
-        logger.info(f"Extracted [bold]{len(notes)}[/bold] notes from books")
-
-    # Create database
-    if verbose:
-        logger.info(f"Creating database at {db_path}...")
-    create_database(db_path)
-
-    # Connect and load
-    adapter = get_connection(db_path)
-
-    # Track unique books and authors
-    books_seen: dict[str, dict] = {}
-    authors_seen: dict[str, str] = {}  # name -> id mapping
-
-    if verbose:
-        logger.info("Loading data...")
-
-    for i, note in enumerate(notes):
-        # Extract data from note
-        title = note.get("title", "Unknown")
-
-        # Extract author name parts
-        author_first_name = note.get("author_first_name", "")
-        author_last_name = note.get("author_last_name", "")
-        author = generate_author(author_first_name, author_last_name)
-
-        section = note.get("section", "")
-        excerpt = note.get("excerpt", "")
-
-        # Generate IDs
-        author_id = generate_author_id(author)
-        book_id = generate_book_id(title, author)
-
-        # Insert author if not seen
-        if author not in authors_seen:
-            try:
-                adapter.execute(
-                    """
-                    INSERT INTO authors (id, first_name, last_name, name)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(name) DO UPDATE SET
-                        first_name=excluded.first_name,
-                        last_name=excluded.last_name
-                """,
-                    (author_id, author_first_name, author_last_name, author),
-                )
-                authors_seen[author] = author_id
-            except IntegrityError:
-                # Author already exists
-                authors_seen[author] = author_id
-
-        # Insert book if not seen
-        if book_id not in books_seen:
-            try:
-                adapter.execute(
-                    """
-                    INSERT INTO books (id, title)
-                    VALUES (?, ?)
-                    ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
-                """,
-                    (book_id, title),
-                )
-                books_seen[book_id] = {"title": title, "author": author}
-
-                # Link book to author
-                adapter.execute(
-                    """
-                    INSERT INTO book_authors (book_id, author_id)
-                    VALUES (?, ?)
-                    ON CONFLICT DO NOTHING
-                """,
-                    (book_id, author_id),
-                )
-            except IntegrityError:
-                # Book already exists
-                pass
-
-        # Insert note
-        adapter.execute(
-            """
-            INSERT INTO notes (book_id, section, excerpt, faiss_index)
-            VALUES (?, ?, ?, ?)
-        """,
-            (book_id, section, excerpt, i),
-        )
-
-        if verbose and (i + 1) % 500 == 0:
-            logger.debug(f"  Processed {i + 1}/{len(notes)} notes...")
-
-    adapter.commit()
-
-    # Print summary
-    if verbose:
-        result = adapter.fetchone("SELECT COUNT(*) FROM books")
-        book_count = result[list(result.keys())[0]]
-
-        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
-        author_count = result[list(result.keys())[0]]
-
-        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
-        note_count = result[list(result.keys())[0]]
-
-        logger.info("\n[green]✓[/green] Load complete!")
-        logger.info(f"  Books: [bold]{book_count}[/bold]")
-        logger.info(f"  Authors: [bold]{author_count}[/bold]")
-        logger.info(f"  Notes: [bold]{note_count}[/bold]")
-
-    adapter.close()
-
-
-def load_from_extractions(
-    index_dir: Path, db_path: Path, verbose: bool = True, force: bool = False
-) -> None:
+def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = False) -> None:
     """Load data from extraction files to database (full rebuild).
+
+    Database configuration is read from environment variables.
 
     Args:
         index_dir: Directory containing extraction files
-        db_path: Path to database file (SQLite) or database name (PostgreSQL)
-        verbose: Print progress messages
-        force: Drop existing tables before creating (PostgreSQL only)
+        verbose: Set to True for INFO level logging, False for WARNING level
+        force: Drop existing tables before creating
 
     Raises:
         ValueError: If no extraction files found
     """
+    _set_log_level(verbose)
     index_dir = Path(index_dir)
-    db_path = Path(db_path)
 
     if not index_dir.exists():
         raise FileNotFoundError(f"Index directory not found: {index_dir}")
 
     # Replay all extractions to get current state
-    if verbose:
-        logger.info(f"Replaying all extractions from {index_dir}...")
+    logger.info(f"Replaying all extractions from {index_dir}...")
     items = replay_all_extractions(index_dir)
 
     if not items:
         raise ValueError(f"No items found in extraction files at {index_dir}")
 
-    if verbose:
-        logger.info(f"Found [bold]{len(items)}[/bold] items")
+    logger.info(f"Found [bold]{len(items)}[/bold] items")
 
     # Create database
-    if verbose:
-        logger.info(f"Creating database at {db_path}...")
+    logger.info("Creating database...")
 
-    # For PostgreSQL with force flag, drop existing tables first
+    # For force flag, drop existing schema first
     if force:
-        from common.env import env
+        adapter = get_connection()
+        adapter.drop_schema()
+        adapter.close()
 
-        if env.database_type().lower() == "postgresql":
-            adapter = get_connection(db_path)
-            adapter.drop_schema()
-            adapter.close()
-
-    create_database(db_path)
+    create_database()
 
     # Connect and load
-    adapter = get_connection(db_path)
+    adapter = get_connection()
 
     # Track unique books and authors
     books_seen: dict[str, dict] = {}
     authors_seen: dict[str, str] = {}  # name -> id mapping
 
-    if verbose:
-        logger.info("Loading data...")
+    logger.info("Loading data...")
 
     for i, item in enumerate(items):
         # Extract data from item
@@ -331,7 +174,7 @@ def load_from_extractions(
             (item.item_id, book_id, section, excerpt, i),
         )
 
-        if verbose and (i + 1) % 500 == 0:
+        if (i + 1) % 500 == 0:
             logger.debug(f"  Processed {i + 1}/{len(items)} items...")
 
     # Store checkpoint (get latest extraction's commit hash)
@@ -342,58 +185,47 @@ def load_from_extractions(
     adapter.commit()
 
     # Print summary
-    if verbose:
-        result = adapter.fetchone("SELECT COUNT(*) FROM books")
-        book_count = result[list(result.keys())[0]]
+    result = adapter.fetchone("SELECT COUNT(*) FROM books")
+    book_count = result[list(result.keys())[0]]
 
-        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
-        author_count = result[list(result.keys())[0]]
+    result = adapter.fetchone("SELECT COUNT(*) FROM authors")
+    author_count = result[list(result.keys())[0]]
 
-        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
-        note_count = result[list(result.keys())[0]]
+    result = adapter.fetchone("SELECT COUNT(*) FROM notes")
+    note_count = result[list(result.keys())[0]]
 
-        logger.info("\n[green]✓[/green] Load complete!")
-        logger.info(f"  Books: [bold]{book_count}[/bold]")
-        logger.info(f"  Authors: [bold]{author_count}[/bold]")
-        logger.info(f"  Notes: [bold]{note_count}[/bold]")
+    logger.info("\n[green]✓[/green] Load complete!")
+    logger.info(f"  Books: [bold]{book_count}[/bold]")
+    logger.info(f"  Authors: [bold]{author_count}[/bold]")
+    logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
     adapter.close()
 
 
-def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
+def load_incremental(index_dir: Path, verbose: bool = True) -> None:
     """Apply incremental updates from extraction files to existing database.
+
+    Database configuration is read from environment variables.
 
     Args:
         index_dir: Directory containing extraction files
-        db_path: Path to database file (SQLite) or database name (PostgreSQL)
-        verbose: Print progress messages
+        verbose: Set to True for INFO level logging, False for WARNING level
 
     Raises:
         ValueError: If no checkpoint found or database doesn't exist
     """
+    _set_log_level(verbose)
     index_dir = Path(index_dir)
-    db_path = Path(db_path)
 
     # Check if database exists
-    from common.env import env
+    from load.db import get_adapter
 
-    db_type = env.database_type()
-
-    if db_type.lower() == "sqlite":
-        # For SQLite, check if file exists
-        if not db_path.exists():
-            raise ValueError(f"Database not found: {db_path}. Run full load first.")
-    else:
-        # For PostgreSQL, check if tables exist
-        adapter = get_connection(db_path)
-        tables = adapter.get_tables()
-        adapter.close()
-
-        if not tables:
-            raise ValueError(f"Database '{db_path}' has no tables. Run full load first.")
+    check_adapter = get_adapter()
+    if not check_adapter.exists():
+        raise ValueError("Database not found or has no tables. Run full load first.")
 
     # Connect to database
-    adapter = get_connection(db_path)
+    adapter = get_connection()
 
     # Get last processed commit
     last_commit = get_checkpoint(adapter)
@@ -401,20 +233,17 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
         adapter.close()
         raise ValueError("No checkpoint found in database. Run full load first.")
 
-    if verbose:
-        logger.info(f"Last processed commit: {last_commit[:7]}")
+    logger.info(f"Last processed commit: {last_commit[:7]}")
 
     # Get new extractions since checkpoint
     new_extractions = get_new_extractions_since(index_dir, last_commit)
 
     if not new_extractions:
-        if verbose:
-            logger.info("[green]✓[/green] No new extractions to process")
+        logger.info("[green]✓[/green] No new extractions to process")
         adapter.close()
         return
 
-    if verbose:
-        logger.info(f"Found [bold]{len(new_extractions)}[/bold] new extraction(s)")
+    logger.info(f"Found [bold]{len(new_extractions)}[/bold] new extraction(s)")
 
     # Track stats
     adds = 0
@@ -423,10 +252,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
     # Process each extraction
     for extraction in new_extractions:
-        if verbose:
-            logger.debug(
-                f"Processing extraction: {extraction.extraction_metadata.git_commit_hash[:7]}"
-            )
+        logger.debug(f"Processing extraction: {extraction.extraction_metadata.git_commit_hash[:7]}")
 
         for item in extraction.items:
             author = generate_author(item.author_first_name, item.author_last_name)
@@ -501,73 +327,21 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
     adapter.commit()
 
-    if verbose:
-        logger.info("\n[green]✓[/green] Incremental load complete!")
-        logger.info(f"  Adds: [bold]{adds}[/bold]")
-        logger.info(f"  Updates: [bold]{updates}[/bold]")
-        logger.info(f"  Deletes: [bold]{deletes}[/bold]")
+    logger.info("\n[green]✓[/green] Incremental load complete!")
+    logger.info(f"  Adds: [bold]{adds}[/bold]")
+    logger.info(f"  Updates: [bold]{updates}[/bold]")
+    logger.info(f"  Deletes: [bold]{deletes}[/bold]")
 
     adapter.close()
-
-
-def verify_load(db_path: str | Path, json_path: str | Path) -> bool:
-    """Verify that data load preserved all data.
-
-    Args:
-        db_path: Path to SQLite database
-        json_path: Path to original JSON file
-
-    Returns:
-        True if verification passes
-    """
-    # Load JSON and count notes
-    with open(json_path) as f:
-        data = json.load(f)
-
-    books = data.get("books", [])
-    json_note_count = 0
-    for book in books:
-        sections_data = book.get("sections", {})
-        for _, excerpts in sections_data.items():
-            if isinstance(excerpts, list):
-                json_note_count += len(excerpts)
-
-    # Check DB
-    adapter = get_connection(db_path)
-
-    result = adapter.fetchone("SELECT COUNT(*) FROM notes")
-    db_note_count = result[list(result.keys())[0]]
-
-    rows = adapter.fetchall("SELECT faiss_index FROM notes ORDER BY faiss_index")
-    faiss_indices = [row["faiss_index"] for row in rows]
-
-    adapter.close()
-
-    # Verify
-    if json_note_count != db_note_count:
-        logger.error(
-            f"[red]✗[/red] Note count mismatch: JSON={json_note_count}, DB={db_note_count}"
-        )
-        return False
-
-    # Check that faiss_index values are sequential
-    if faiss_indices != list(range(len(faiss_indices))):
-        logger.error("[red]✗[/red] FAISS indices are not sequential")
-        return False
-
-    logger.info("[green]✓[/green] Load verification passed")
-    return True
 
 
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) < 3:
-        logger.error("Usage: python load_data.py <index.json> <database.db>")
+    if len(sys.argv) < 2:
+        logger.error("Usage: python -m load.load_data <index_dir>")
+        logger.error("  Database configuration is read from .env")
         sys.exit(1)
 
-    json_path = sys.argv[1]
-    db_path = sys.argv[2]
-
-    load_from_json(json_path, db_path, verbose=True)
-    verify_load(db_path, json_path)
+    index_dir = Path(sys.argv[1])
+    load_from_extractions(index_dir, verbose=True)

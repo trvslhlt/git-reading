@@ -134,17 +134,22 @@ st.markdown("---")
 with st.expander("🚀 Quick Setup Guide", expanded=False):
     db_type = env.database_type()
     if db_type.lower() == "postgresql":
-        db_example = "git_reading"
         db_setup = """
-2. **Start PostgreSQL** (if using PostgreSQL - default)
+2. **Configure database** (PostgreSQL - default)
    ```bash
-   make postgres-up
-   cp .env.example .env  # Configure credentials
+   make postgres-up           # Start PostgreSQL
+   cp .env.example .env       # Configure credentials
    ```
+   Edit `.env` to set DATABASE_TYPE=postgresql and connection details.
 """
     else:
-        db_example = "./data/readings.db"
-        db_setup = ""
+        db_setup = """
+2. **Configure database** (SQLite)
+   ```bash
+   cp .env.example .env       # Configure credentials
+   ```
+   Edit `.env` to set DATABASE_TYPE=sqlite and DATABASE_PATH.
+"""
 
     st.markdown(
         f"""
@@ -158,9 +163,9 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
 {db_setup}
 3. **Load to database** (optional, for Database Explorer)
    ```bash
-   load-db load --index-dir data/index --database {db_example}
+   load-db load --index-dir data/index
    ```
-   This creates a {db_type.upper()} database from the extraction files.
+   Database configuration is read from `.env` file.
 
 4. **Build search index** (optional, for Semantic Search)
    ```bash
@@ -173,8 +178,8 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
 Whenever you add new reading notes:
 
 ```bash
-extract readings --notes-dir <path>                                    # Re-extract (incremental)
-load-db load --index-dir data/index --database {db_example} --incremental  # Update database
+extract readings --notes-dir <path>              # Re-extract (incremental)
+load-db load --index-dir data/index --incremental  # Update database
 search build --index-dir data/index --output data/vector_store --incremental # Update search
 ```
 
@@ -199,35 +204,24 @@ with col1:
         st.caption("Run `extract readings --notes-dir <path>`")
 
 with col2:
-    db_type = env.database_type()
-    if db_type.lower() == "sqlite":
-        # For SQLite, check if file exists
-        db_path = env.database_path()
-        db_exists = db_path.exists()
-        db_label = f"Database ({db_type})"
-    else:
-        # For PostgreSQL, try to connect
-        try:
-            from load.db_schema import get_connection
+    from load.db import get_adapter
 
-            db_identifier = env.postgres_database()
-            adapter = get_connection(db_identifier)
-            tables = adapter.get_tables()
-            adapter.close()
-            db_exists = len(tables) > 0
-            db_label = "Database (PostgreSQL)"
-        except Exception:
-            db_exists = False
-            db_label = "Database (PostgreSQL)"
+    db_type = env.database_type()
+
+    # Database status check - use adapter interface
+    try:
+        adapter = get_adapter()  # Uses env config
+        db_exists = adapter.exists()
+        db_label = f"Database ({db_type})"
+    except Exception:
+        db_exists = False
+        db_label = f"Database ({db_type})"
 
     if db_exists:
         st.success(f"✅ {db_label} found")
     else:
         st.warning(f"⚠️ {db_label} not found")
-        if db_type.lower() == "postgresql":
-            st.caption("Run `make postgres-up` then load data")
-        else:
-            st.caption("Run `load-db load --index-dir <path> --database <path>`")
+        st.caption("Run `load-db load --index-dir data/index`")
 
 with col3:
     vector_exists = Path(VECTOR_STORE_DIR).exists()

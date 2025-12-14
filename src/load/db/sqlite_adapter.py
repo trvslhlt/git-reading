@@ -173,6 +173,30 @@ class SQLiteAdapter(DatabaseAdapter):
         """
         return "?"
 
+    def exists(self) -> bool:
+        """Check if SQLite database file exists."""
+        return self.db_path.exists()
+
+    def delete(self) -> None:
+        """Delete SQLite database file."""
+        if self._conn:
+            self.close()
+        if self.db_path.exists():
+            self.db_path.unlink()
+
+    def drop_schema(self) -> None:
+        """Drop all tables in SQLite database."""
+        if not self._conn:
+            raise DatabaseError("No active connection")
+
+        cursor = self._conn.cursor()
+        tables = self.get_tables()
+        # Filter out sqlite_sequence (automatically maintained by SQLite)
+        tables = [t for t in tables if t != "sqlite_sequence"]
+        for table in tables:
+            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+        self._conn.commit()
+
     def __repr__(self) -> str:
         """String representation."""
         status = "connected" if self._conn else "disconnected"

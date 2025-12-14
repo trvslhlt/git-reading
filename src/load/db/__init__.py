@@ -18,9 +18,8 @@ Example:
     >>> adapter.close()
 """
 
-from .factory import DatabaseConfig, create_database
+from .factory import DatabaseConfig, create_database, get_adapter
 from .interface import DatabaseAdapter
-from .sqlite_adapter import SQLiteAdapter
 from .types import (
     ConnectionError,
     DatabaseError,
@@ -34,10 +33,9 @@ __all__ = [
     # Factory
     "DatabaseConfig",
     "create_database",
+    "get_adapter",
     # Interface
     "DatabaseAdapter",
-    # Adapters
-    "SQLiteAdapter",
     # Types and exceptions
     "DatabaseType",
     "DatabaseError",
