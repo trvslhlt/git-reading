@@ -3,14 +3,15 @@
 This is a multi-page app with:
 1. Analytics Overview - Statistics and visualizations
 2. Semantic Search - AI-powered search of your notes
-3. Database Explorer - Browse and query the SQLite database
+3. Database Explorer - Browse and query the database (PostgreSQL or SQLite)
 
 Run with: streamlit run streamlit_app/app.py
 """
 
 import streamlit as st
 
-from common.constants import DATABASE_PATH, INDEX_DIR, VECTOR_STORE_DIR
+from common.constants import INDEX_DIR, VECTOR_STORE_DIR
+from common.env import env
 
 # Page configuration
 st.set_page_config(
@@ -112,9 +113,10 @@ Perfect for finding that quote you remember.
 
 with col3:
     st.subheader("🗄️ Database Explorer")
+    db_type = env.database_type()
     st.markdown(
-        """
-Query the SQLite database directly:
+        f"""
+Query the {db_type.upper()} database directly:
 - Browse all tables
 - Execute custom SQL queries
 - View schema and relationships
@@ -130,8 +132,22 @@ st.markdown("---")
 
 # Quick setup guide
 with st.expander("🚀 Quick Setup Guide", expanded=False):
+    db_type = env.database_type()
+    if db_type.lower() == "postgresql":
+        db_example = "git_reading"
+        db_setup = """
+2. **Start PostgreSQL** (if using PostgreSQL - default)
+   ```bash
+   make postgres-up
+   cp .env.example .env  # Configure credentials
+   ```
+"""
+    else:
+        db_example = "./data/readings.db"
+        db_setup = ""
+
     st.markdown(
-        """
+        f"""
 ### First Time Setup
 
 1. **Extract your reading notes**
@@ -139,16 +155,16 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
    extract readings --notes-dir <path>
    ```
    This creates extraction files in `./data/index/` from your markdown files.
-
-2. **Load to database** (optional, for Database Explorer)
+{db_setup}
+3. **Load to database** (optional, for Database Explorer)
    ```bash
-   load-db load --index-dir <path> --database <path>
+   load-db load --index-dir data/index --database {db_example}
    ```
-   This creates a SQLite database from the extraction files.
+   This creates a {db_type.upper()} database from the extraction files.
 
-3. **Build search index** (optional, for Semantic Search)
+4. **Build search index** (optional, for Semantic Search)
    ```bash
-   search build --index-dir <path> --output <path>
+   search build --index-dir data/index --output data/vector_store
    ```
    This creates a vector store for semantic search.
 
@@ -157,9 +173,9 @@ with st.expander("🚀 Quick Setup Guide", expanded=False):
 Whenever you add new reading notes:
 
 ```bash
-extract readings --notes-dir <path>              # Re-extract from markdown (incremental)
-load-db load --index-dir <path> --database <path> --incremental  # Update database
-search build --index-dir <path> --output <path> --incremental       # Update search index
+extract readings --notes-dir <path>                                    # Re-extract (incremental)
+load-db load --index-dir data/index --database {db_example} --incremental  # Update database
+search build --index-dir data/index --output data/vector_store --incremental # Update search
 ```
 
 Then refresh this app to see the changes!
@@ -183,12 +199,35 @@ with col1:
         st.caption("Run `extract readings --notes-dir <path>`")
 
 with col2:
-    db_exists = Path(DATABASE_PATH).exists()
-    if db_exists:
-        st.success("✅ Database found")
+    db_type = env.database_type()
+    if db_type.lower() == "sqlite":
+        # For SQLite, check if file exists
+        db_path = env.database_path()
+        db_exists = db_path.exists()
+        db_label = f"Database ({db_type})"
     else:
-        st.warning("⚠️ Database not found")
-        st.caption("Run `load-db load --index-dir <path> --database <path>`")
+        # For PostgreSQL, try to connect
+        try:
+            from load.db_schema import get_connection
+
+            db_identifier = env.postgres_database()
+            adapter = get_connection(db_identifier)
+            tables = adapter.get_tables()
+            adapter.close()
+            db_exists = len(tables) > 0
+            db_label = f"Database (PostgreSQL)"
+        except Exception:
+            db_exists = False
+            db_label = f"Database (PostgreSQL)"
+
+    if db_exists:
+        st.success(f"✅ {db_label} found")
+    else:
+        st.warning(f"⚠️ {db_label} not found")
+        if db_type.lower() == "postgresql":
+            st.caption("Run `make postgres-up` then load data")
+        else:
+            st.caption("Run `load-db load --index-dir <path> --database <path>`")
 
 with col3:
     vector_exists = Path(VECTOR_STORE_DIR).exists()
