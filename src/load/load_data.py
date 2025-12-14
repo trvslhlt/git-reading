@@ -157,7 +157,7 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
                     """
                     INSERT INTO books (id, title)
                     VALUES (?, ?)
-                    ON CONFLICT(id) DO UPDATE SET title=title
+                    ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
                 """,
                     (book_id, title),
                 )
@@ -209,13 +209,16 @@ def load_from_json(json_path: str | Path, db_path: str | Path, verbose: bool = T
     adapter.close()
 
 
-def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) -> None:
-    """Load data from extraction files to SQLite database (full rebuild).
+def load_from_extractions(
+    index_dir: Path, db_path: Path, verbose: bool = True, force: bool = False
+) -> None:
+    """Load data from extraction files to database (full rebuild).
 
     Args:
         index_dir: Directory containing extraction files
-        db_path: Path to SQLite database file
+        db_path: Path to database file (SQLite) or database name (PostgreSQL)
         verbose: Print progress messages
+        force: Drop existing tables before creating (PostgreSQL only)
 
     Raises:
         ValueError: If no extraction files found
@@ -240,6 +243,16 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
     # Create database
     if verbose:
         logger.info(f"Creating database at {db_path}...")
+
+    # For PostgreSQL with force flag, drop existing tables first
+    if force:
+        from common.env import env
+
+        if env.database_type().lower() == "postgresql":
+            adapter = get_connection(db_path)
+            adapter.drop_schema()
+            adapter.close()
+
     create_database(db_path)
 
     # Connect and load
@@ -290,7 +303,7 @@ def load_from_extractions(index_dir: Path, db_path: Path, verbose: bool = True) 
                     """
                     INSERT INTO books (id, title)
                     VALUES (?, ?)
-                    ON CONFLICT(id) DO UPDATE SET title=title
+                    ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
                 """,
                     (book_id, title),
                 )
@@ -352,7 +365,7 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
 
     Args:
         index_dir: Directory containing extraction files
-        db_path: Path to SQLite database file
+        db_path: Path to database file (SQLite) or database name (PostgreSQL)
         verbose: Print progress messages
 
     Raises:
@@ -361,8 +374,23 @@ def load_incremental(index_dir: Path, db_path: Path, verbose: bool = True) -> No
     index_dir = Path(index_dir)
     db_path = Path(db_path)
 
-    if not db_path.exists():
-        raise ValueError(f"Database not found: {db_path}. Run full load first.")
+    # Check if database exists
+    from common.env import env
+
+    db_type = env.database_type()
+
+    if db_type.lower() == "sqlite":
+        # For SQLite, check if file exists
+        if not db_path.exists():
+            raise ValueError(f"Database not found: {db_path}. Run full load first.")
+    else:
+        # For PostgreSQL, check if tables exist
+        adapter = get_connection(db_path)
+        tables = adapter.get_tables()
+        adapter.close()
+
+        if not tables:
+            raise ValueError(f"Database '{db_path}' has no tables. Run full load first.")
 
     # Connect to database
     adapter = get_connection(db_path)

@@ -9,6 +9,7 @@ import streamlit as st
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from common.env import env
 from load.db import DatabaseAdapter
 from load.db_schema import get_connection
 
@@ -44,26 +45,41 @@ def main():
     st.title("🗄️ Database Explorer")
     st.markdown("*Browse and query the reading notes database*")
 
-    # Check if database exists
-    db_path = Path("./data/readings.db")
-    if not db_path.exists():
-        st.warning(
-            "Database not found. Load the data first:\n\n"
-            "```bash\nload-db load --index-dir <path> --database <path>\n```"
-        )
-        st.info(
-            "💡 **What is the database?**\n\n"
-            "The database stores all your reading notes in a structured format "
-            "that's easier to query and extend than a single JSON file. "
-            "It includes tables for books, authors, excerpts, and their relationships."
-        )
-        return
+    # Determine database backend and path/name
+    db_type = env.database_type()
+
+    if db_type.lower() == "sqlite":
+        # SQLite - use file path
+        db_identifier = env.database_path()
+        if not db_identifier.exists():
+            st.warning(
+                f"SQLite database not found at: `{db_identifier}`\n\n"
+                "Load the data first:\n\n"
+                "```bash\nDATABASE_TYPE=sqlite load-db load --index-dir data/index --database data/readings.db\n```"
+            )
+            st.info(
+                "💡 **What is the database?**\n\n"
+                "The database stores all your reading notes in a structured format "
+                "that's easier to query and extend than a single JSON file. "
+                "It includes tables for books, authors, excerpts, and their relationships."
+            )
+            return
+    else:
+        # PostgreSQL - use database name
+        db_identifier = env.postgres_database()
 
     # Connect to database
     try:
-        adapter = get_connection(db_path)
+        adapter = get_connection(db_identifier)
     except Exception as e:
-        st.error(f"Failed to connect to database: {e}")
+        st.error(f"Failed to connect to {db_type} database: {e}")
+        if db_type.lower() == "postgresql":
+            st.info(
+                "💡 **PostgreSQL Connection Failed**\n\n"
+                "Make sure PostgreSQL is running:\n\n"
+                "```bash\nmake postgres-up\n```\n\n"
+                "And verify your `.env` file has the correct credentials."
+            )
         return
 
     # Get list of tables

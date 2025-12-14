@@ -108,20 +108,28 @@ No dependencies needed - just specify the database file path.
 
 ### Step 1: Load the Data
 
+The `--database` argument is interpreted based on your `DATABASE_TYPE` setting:
+- **PostgreSQL**: Provide database name (e.g., `readings`)
+- **SQLite**: Provide file path (e.g., `data/readings.db`)
+
 ```bash
-# PostgreSQL (default)
+# PostgreSQL (default) - use database name
 make run-load ARGS='--index-dir data/index --database readings'
 
-# SQLite (if DATABASE_TYPE=sqlite is set)
+# SQLite - use file path
 export DATABASE_TYPE=sqlite
 make run-load ARGS='--index-dir data/index --database data/readings.db'
 
-# Force overwrite existing database
+# Force overwrite existing data
 make run-load ARGS='--index-dir data/index --database readings --force'
 
 # Incremental update
 make run-load ARGS='--index-dir data/index --database readings --incremental'
 ```
+
+**Note**:
+- For **SQLite**, `--force` deletes and recreates the database file
+- For **PostgreSQL**, `--force` drops and recreates all tables in the existing database
 
 ### Step 2: Verify Load
 

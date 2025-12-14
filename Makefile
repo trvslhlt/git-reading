@@ -37,7 +37,7 @@ help:
 	@echo ""
 	@echo "Data Pipeline Commands:"
 	@echo "  make run-extract         - Extract reading notes from markdown files"
-	@echo "  make run-load            - Load extraction files to SQLite database"
+	@echo "  make run-load            - Load extraction files to database (SQLite or PostgreSQL)"
 	@echo "  make run-validate        - Validate markdown files against rules"
 	@echo "  make run-fix             - Interactively fix validation issues"
 	@echo "  make run-learn-patterns  - Learn validation patterns from corpus"
@@ -196,21 +196,35 @@ run-extract:
 	@echo "Extracting reading notes..."
 	PYTHONPATH=src uv run extract readings $(ARGS)
 
-# Load extraction files to SQLite database
+# Load extraction files to database (SQLite or PostgreSQL)
 # REQUIRES ARGS to prevent accidental file operations
 # CLI requires: --index-dir, --database (both required at CLI level)
-# Note: See INDEX_DIR and DATABASE_PATH in common.constants for defaults
-# Usage: make run-load ARGS='--index-dir <path> --database <path>'
-#        make run-load ARGS='--index-dir <path> --database <path> --incremental'
-#        make run-load ARGS='--help'
+#
+# Database argument interpretation depends on DATABASE_TYPE environment variable:
+#   - SQLite (DATABASE_TYPE=sqlite): Provide file path
+#   - PostgreSQL (DATABASE_TYPE=postgresql): Provide database name
+#
+# Usage:
+#   PostgreSQL (default):
+#     make run-load ARGS='--index-dir data/index --database readings'
+#     make run-load ARGS='--index-dir data/index --database readings --incremental'
+#
+#   SQLite:
+#     DATABASE_TYPE=sqlite make run-load ARGS='--index-dir data/index --database data/readings.db'
+#
+#   Help:
+#     make run-load ARGS='--help'
 run-load:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
-		echo "Usage:"; \
-		echo "  make run-load ARGS='--index-dir <path> --database <path>'"; \
-		echo "  make run-load ARGS='--index-dir <path> --database <path> --incremental'"; \
-		echo "  make run-load ARGS='--help'"; \
+		echo "Usage (depends on DATABASE_TYPE environment variable):"; \
+		echo "  PostgreSQL (default):"; \
+		echo "    make run-load ARGS='--index-dir data/index --database readings'"; \
+		echo "  SQLite:"; \
+		echo "    DATABASE_TYPE=sqlite make run-load ARGS='--index-dir data/index --database data/readings.db'"; \
+		echo "  Help:"; \
+		echo "    make run-load ARGS='--help'"; \
 		exit 1; \
 	fi
 	@echo "Loading to database..."
