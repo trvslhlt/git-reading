@@ -34,13 +34,12 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
 
-  - repo: local
-    hooks:
-      # Run tests before commit (optional - can be slow)
-      # Uncomment if you want tests to run on every commit
-      # - id: pytest
-      #   name: Run pytest
-      #   entry: uv run pytest
-      #   language: system
-      #   pass_filenames: false
-      #   always_run: true
+  # Uncomment to run tests before every commit (can be slow)
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: Run pytest
+  #       entry: uv run pytest
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
