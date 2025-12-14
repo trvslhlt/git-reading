@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "rich>=13.0.0",  # Beautiful CLI output and logging
+    "python-dotenv>=1.0.0",  # Load environment variables from .env file
 ]
 
 [project.optional-dependencies]

@@ -4,6 +4,7 @@ This adapter wraps psycopg3 functionality to provide a consistent interface
 for database operations across different database backends.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,10 @@ from .interface import DatabaseAdapter
 from .types import ConnectionError as DBConnectionError
 from .types import DatabaseError, Row, SchemaError
 from .types import IntegrityError as DBIntegrityError
+
+# Suppress verbose psycopg logging (connection pool internals)
+logging.getLogger("psycopg.pool").setLevel(logging.WARNING)
+logging.getLogger("psycopg").setLevel(logging.WARNING)
 
 
 class PostgreSQLAdapter(DatabaseAdapter):
@@ -72,11 +77,16 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 f"user={self.user} password={self.password}"
             )
 
-            # Create connection pool
+            # Create connection pool with custom logger to suppress verbose output
+            # Use a logger at WARNING level to suppress INFO messages about connections
+            pool_logger = logging.getLogger(f"psycopg.pool.{id(self)}")
+            pool_logger.setLevel(logging.WARNING)
+
             self._pool = ConnectionPool(
                 conninfo,
                 min_size=self.pool_size,
                 max_size=self.pool_size + self.pool_max_overflow,
+                configure=lambda conn: setattr(conn, "row_factory", dict_row),
             )
 
             # Get a connection from the pool
@@ -91,6 +101,14 @@ class PostgreSQLAdapter(DatabaseAdapter):
     def close(self) -> None:
         """Close database connection and connection pool."""
         if self._conn and self._pool:
+            # Rollback any uncommitted transaction before returning to pool
+            # This prevents psycopg from logging warnings about INTRANS state
+            try:
+                if self._conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+                    self._conn.rollback()
+            except Exception:
+                pass  # Ignore errors during cleanup
+
             self._pool.putconn(self._conn)
             self._conn = None
 
@@ -136,6 +154,23 @@ class PostgreSQLAdapter(DatabaseAdapter):
             raise SchemaError(f"Failed to create schema: {e}") from e
         except OSError as e:
             raise SchemaError(f"Failed to read schema file: {e}") from e
+
+    def drop_schema(self) -> None:
+        """Drop all tables in the database."""
+        if not self._conn:
+            raise DatabaseError("No active connection")
+
+        try:
+            # Get all tables and drop them in order (respecting foreign keys)
+            tables = self.get_tables()
+            if tables:
+                with self._conn.cursor() as cursor:
+                    # Drop all tables with CASCADE to handle foreign keys
+                    for table in tables:
+                        cursor.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+                self._conn.commit()
+        except psycopg.Error as e:
+            raise SchemaError(f"Failed to drop schema: {e}") from e
 
     def get_tables(self) -> list[str]:
         """Get list of all tables in database."""
