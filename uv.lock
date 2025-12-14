@@ -376,6 +376,7 @@ streamlit = [
     { name = "watchdog" },
 ]
 test = [
+    { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -383,6 +384,7 @@ test-full = [
     { name = "faiss-cpu" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "sentence-transformers" },
@@ -397,6 +399,8 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'streamlit'", specifier = ">=2.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'postgresql'", specifier = ">=3.1.0" },
+    { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'test'", specifier = ">=3.1.0" },
+    { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'test-full'", specifier = ">=3.1.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0" },
     { name = "pytest", marker = "extra == 'test-full'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0" },

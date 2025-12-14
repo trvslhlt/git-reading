@@ -7,26 +7,15 @@ import pytest
 
 from load.db import (
     DatabaseConfig,
-    DatabaseError,
     IntegrityError,
     SQLiteAdapter,
     create_database,
 )
+from load.db.postgres_adapter import PostgreSQLAdapter
 
-# Check if PostgreSQL dependencies are available
-try:
-    from load.db.postgres_adapter import PostgreSQLAdapter
-
-    POSTGRES_AVAILABLE = True
-except ImportError:
-    POSTGRES_AVAILABLE = False
-
-# Skip PostgreSQL tests if not available or not configured
-POSTGRES_ENABLED = (
-    POSTGRES_AVAILABLE
-    and os.getenv("DATABASE_TYPE") == "postgresql"
-    and os.getenv("RUN_POSTGRES_TESTS") == "1"
-)
+# Skip PostgreSQL integration tests unless explicitly enabled
+# (These tests require a running PostgreSQL instance)
+POSTGRES_INTEGRATION_ENABLED = os.getenv("RUN_POSTGRES_TESTS") == "1"
 
 
 class TestSQLiteAdapter:
@@ -254,20 +243,21 @@ class TestDatabaseFactory:
         assert isinstance(config.db_path, Path)
 
 
-@pytest.mark.skipif(not POSTGRES_ENABLED, reason="PostgreSQL tests not enabled")
+@pytest.mark.skipif(
+    not POSTGRES_INTEGRATION_ENABLED, reason="PostgreSQL integration tests not enabled"
+)
 class TestPostgreSQLAdapter:
     """Tests for PostgreSQL adapter.
 
-    These tests require a running PostgreSQL instance and are only run when:
-    1. psycopg dependencies are installed
-    2. DATABASE_TYPE=postgresql environment variable is set
-    3. RUN_POSTGRES_TESTS=1 environment variable is set
+    These integration tests require a running PostgreSQL instance and are skipped by default.
 
     To run these tests:
     1. Start PostgreSQL: make postgres-up
-    2. Install dependencies: make postgres-install
-    3. Set environment: export DATABASE_TYPE=postgresql RUN_POSTGRES_TESTS=1
-    4. Run tests: make test
+    2. Set environment: export RUN_POSTGRES_TESTS=1
+    3. Run tests: make test
+
+    Note: psycopg is always installed as a test dependency, so unit tests for the
+    PostgreSQL adapter (like factory tests) run by default without needing a database.
     """
 
     @pytest.fixture
@@ -433,7 +423,6 @@ class TestPostgreSQLAdapter:
         assert result["value"] == "value"
 
 
-@pytest.mark.skipif(not POSTGRES_AVAILABLE, reason="PostgreSQL dependencies not installed")
 class TestPostgreSQLDatabaseFactory:
     """Tests for PostgreSQL database factory."""
 

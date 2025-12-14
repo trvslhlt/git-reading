@@ -6,16 +6,7 @@ to the database, now using the database abstraction layer.
 
 from pathlib import Path
 
-from common.constants import (
-    DATABASE_TYPE,
-    POSTGRES_DB,
-    POSTGRES_HOST,
-    POSTGRES_PASSWORD,
-    POSTGRES_POOL_MAX_OVERFLOW,
-    POSTGRES_POOL_SIZE,
-    POSTGRES_PORT,
-    POSTGRES_USER,
-)
+from common.env import env
 from load.db import DatabaseAdapter, DatabaseConfig
 from load.db import create_database as create_db_adapter
 
@@ -36,18 +27,17 @@ def create_database(db_path: str | Path) -> None:
             PostgreSQL connection settings (only used when DATABASE_TYPE=postgresql)
     """
     db_path = Path(db_path)
-
-    # Choose database backend based on environment variable
-    if DATABASE_TYPE.lower() == "postgresql":
+    db_type = env.database_type()
+    if db_type.lower() == "postgresql":
         config = DatabaseConfig(
             db_type="postgresql",
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT,
-            database=POSTGRES_DB,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD,
-            pool_size=POSTGRES_POOL_SIZE,
-            pool_max_overflow=POSTGRES_POOL_MAX_OVERFLOW,
+            host=env.postgres_host(),
+            port=env.postgres_port(),
+            database=env.postgres_database(),
+            user=env.postgres_user(),
+            password=env.postgres_password(),
+            pool_size=env.postgres_pool_size(),
+            pool_max_overflow=env.postgres_pool_max_overflow(),
         )
     else:
         # Default to SQLite for backward compatibility
@@ -80,16 +70,18 @@ def get_connection(db_path: str | Path) -> DatabaseAdapter:
     db_path = Path(db_path)
 
     # Choose database backend based on environment variable
-    if DATABASE_TYPE.lower() == "postgresql":
+    # Read directly from environment to allow test fixtures to override
+    db_type = env.database_type()
+    if db_type.lower() == "postgresql":
         config = DatabaseConfig(
             db_type="postgresql",
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT,
-            database=POSTGRES_DB,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD,
-            pool_size=POSTGRES_POOL_SIZE,
-            pool_max_overflow=POSTGRES_POOL_MAX_OVERFLOW,
+            host=env.postgres_host(),
+            port=env.postgres_port(),
+            database=env.postgres_database(),
+            user=env.postgres_user(),
+            password=env.postgres_password(),
+            pool_size=env.postgres_pool_size(),
+            pool_max_overflow=env.postgres_pool_max_overflow(),
         )
     else:
         # Default to SQLite for backward compatibility
