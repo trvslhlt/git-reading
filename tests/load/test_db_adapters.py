@@ -1,16 +1,21 @@
 """Tests for database adapters."""
 
+import os
 from pathlib import Path
 
 import pytest
 
 from load.db import (
     DatabaseConfig,
-    DatabaseError,
     IntegrityError,
     SQLiteAdapter,
     create_database,
 )
+from load.db.postgres_adapter import PostgreSQLAdapter
+
+# Skip PostgreSQL integration tests unless explicitly enabled
+# (These tests require a running PostgreSQL instance)
+POSTGRES_INTEGRATION_ENABLED = os.getenv("RUN_POSTGRES_TESTS") == "1"
 
 
 class TestSQLiteAdapter:
@@ -236,3 +241,231 @@ class TestDatabaseFactory:
         """Test that config converts string paths to Path objects."""
         config = DatabaseConfig(db_type="sqlite", db_path="test.db")
         assert isinstance(config.db_path, Path)
+
+
+@pytest.mark.skipif(
+    not POSTGRES_INTEGRATION_ENABLED, reason="PostgreSQL integration tests not enabled"
+)
+class TestPostgreSQLAdapter:
+    """Tests for PostgreSQL adapter.
+
+    These integration tests require a running PostgreSQL instance and are skipped by default.
+
+    To run these tests:
+    1. Start PostgreSQL: make postgres-up
+    2. Set environment: export RUN_POSTGRES_TESTS=1
+    3. Run tests: make test
+
+    Note: psycopg is always installed as a test dependency, so unit tests for the
+    PostgreSQL adapter (like factory tests) run by default without needing a database.
+    """
+
+    @pytest.fixture
+    def pg_config(self):
+        """Get PostgreSQL configuration from environment."""
+        return {
+            "host": os.getenv("POSTGRES_HOST", "localhost"),
+            "port": int(os.getenv("POSTGRES_PORT", "5432")),
+            "database": os.getenv("POSTGRES_DB", "git_reading"),
+            "user": os.getenv("POSTGRES_USER", "git_reading_user"),
+            "password": os.getenv("POSTGRES_PASSWORD", "dev_password"),
+        }
+
+    @pytest.fixture
+    def pg_adapter(self, pg_config):
+        """Create and setup a PostgreSQL adapter for testing."""
+        adapter = PostgreSQLAdapter(**pg_config)
+        adapter.connect()
+
+        # Create schema
+        adapter.create_schema()
+
+        yield adapter
+
+        # Cleanup - drop all tables
+        tables = adapter.get_tables()
+        for table in tables:
+            adapter.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+        adapter.commit()
+        adapter.close()
+
+    def test_create_adapter(self, pg_config):
+        """Test creating a PostgreSQL adapter."""
+        adapter = PostgreSQLAdapter(**pg_config)
+        assert adapter.host == pg_config["host"]
+        assert adapter.port == pg_config["port"]
+        assert adapter.database == pg_config["database"]
+        assert adapter._conn is None
+
+    def test_connect_and_close(self, pg_config):
+        """Test connecting to and closing database."""
+        adapter = PostgreSQLAdapter(**pg_config)
+
+        adapter.connect()
+        assert adapter._conn is not None
+        assert adapter._pool is not None
+
+        adapter.close()
+        assert adapter._conn is None
+        assert adapter._pool is None
+
+    def test_create_schema(self, pg_adapter):
+        """Test creating database schema."""
+        # Schema already created by fixture, verify tables exist
+        tables = pg_adapter.get_tables()
+        expected_tables = [
+            "author_influences",
+            "authors",
+            "book_authors",
+            "book_genres",
+            "books",
+            "genres",
+            "metadata",
+            "notes",
+        ]
+        assert sorted(tables) == expected_tables
+
+    def test_get_table_schema(self, pg_adapter):
+        """Test getting table schema information."""
+        schema = pg_adapter.get_table_schema("books")
+        assert len(schema) > 0
+
+        # Check for expected columns
+        column_names = [col["name"] for col in schema]
+        assert "id" in column_names
+        assert "title" in column_names
+
+    def test_execute_and_fetchone(self, pg_adapter):
+        """Test executing query and fetching one result."""
+        # Insert test data (note: ? placeholders are auto-converted to %s)
+        pg_adapter.execute(
+            "INSERT INTO metadata (key, value) VALUES (?, ?)",
+            ("test_key", "test_value"),
+        )
+        pg_adapter.commit()
+
+        # Fetch the data
+        result = pg_adapter.fetchone("SELECT key, value FROM metadata WHERE key = ?", ("test_key",))
+        assert result is not None
+        assert result["key"] == "test_key"
+        assert result["value"] == "test_value"
+
+    def test_execute_and_fetchall(self, pg_adapter):
+        """Test executing query and fetching all results."""
+        # Insert multiple rows
+        pg_adapter.execute("INSERT INTO metadata (key, value) VALUES (?, ?)", ("key1", "value1"))
+        pg_adapter.execute("INSERT INTO metadata (key, value) VALUES (?, ?)", ("key2", "value2"))
+        pg_adapter.commit()
+
+        # Fetch all
+        results = pg_adapter.fetchall("SELECT key, value FROM metadata ORDER BY key")
+        assert len(results) == 2
+        assert results[0]["key"] == "key1"
+        assert results[1]["key"] == "key2"
+
+    def test_commit_and_rollback(self, pg_adapter):
+        """Test transaction commit and rollback."""
+        # Test commit
+        pg_adapter.execute(
+            "INSERT INTO metadata (key, value) VALUES (?, ?)", ("commit_test", "value")
+        )
+        pg_adapter.commit()
+
+        result = pg_adapter.fetchone("SELECT value FROM metadata WHERE key = ?", ("commit_test",))
+        assert result is not None
+
+        # Test rollback
+        pg_adapter.execute(
+            "INSERT INTO metadata (key, value) VALUES (?, ?)",
+            ("rollback_test", "value"),
+        )
+        pg_adapter.rollback()
+
+        result = pg_adapter.fetchone("SELECT value FROM metadata WHERE key = ?", ("rollback_test",))
+        assert result is None
+
+    def test_integrity_error(self, pg_adapter):
+        """Test that integrity errors are properly raised."""
+        # Insert a row with primary key
+        pg_adapter.execute("INSERT INTO metadata (key, value) VALUES (?, ?)", ("pk_test", "value1"))
+        pg_adapter.commit()
+
+        # Try to insert duplicate primary key
+        with pytest.raises(IntegrityError):
+            pg_adapter.execute(
+                "INSERT INTO metadata (key, value) VALUES (?, ?)",
+                ("pk_test", "value2"),
+            )
+
+    def test_placeholder_property(self, pg_config):
+        """Test placeholder property."""
+        adapter = PostgreSQLAdapter(**pg_config)
+        assert adapter.placeholder == "%s"
+
+    def test_cursor_method(self, pg_adapter):
+        """Test getting raw cursor."""
+        cursor = pg_adapter.cursor()
+        assert cursor is not None
+
+    def test_placeholder_conversion(self, pg_adapter):
+        """Test that ? placeholders are converted to %s for PostgreSQL."""
+        # This query uses ? placeholders but should work with PostgreSQL
+        pg_adapter.execute(
+            "INSERT INTO metadata (key, value) VALUES (?, ?)",
+            ("conversion_test", "value"),
+        )
+        pg_adapter.commit()
+
+        result = pg_adapter.fetchone(
+            "SELECT value FROM metadata WHERE key = ?", ("conversion_test",)
+        )
+        assert result is not None
+        assert result["value"] == "value"
+
+
+class TestPostgreSQLDatabaseFactory:
+    """Tests for PostgreSQL database factory."""
+
+    def test_create_postgresql_from_config(self):
+        """Test creating PostgreSQL adapter from config."""
+        config = DatabaseConfig(
+            db_type="postgresql",
+            host="localhost",
+            port=5432,
+            database="test_db",
+            user="test_user",
+            password="test_pass",
+        )
+
+        adapter = create_database(config)
+        assert isinstance(adapter, PostgreSQLAdapter)
+        assert adapter.host == "localhost"
+        assert adapter.port == 5432
+
+    def test_config_validates_postgresql_requirements(self):
+        """Test that config validates PostgreSQL requirements."""
+        with pytest.raises(ValueError, match="host, database, and user are required"):
+            DatabaseConfig(db_type="postgresql")
+
+    def test_config_sets_default_port(self):
+        """Test that config sets default PostgreSQL port."""
+        config = DatabaseConfig(
+            db_type="postgresql",
+            host="localhost",
+            database="test_db",
+            user="test_user",
+        )
+        assert config.port == 5432
+
+    def test_config_accepts_pool_settings(self):
+        """Test that config accepts pool size settings."""
+        config = DatabaseConfig(
+            db_type="postgresql",
+            host="localhost",
+            database="test_db",
+            user="test_user",
+            pool_size=10,
+            pool_max_overflow=20,
+        )
+        assert config.pool_size == 10
+        assert config.pool_max_overflow == 20

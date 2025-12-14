@@ -1,6 +1,7 @@
 """Integration tests for database loading."""
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -8,6 +9,12 @@ import pytest
 
 from load.db_schema import create_database
 from load.load_data import load_from_json, verify_load
+
+
+@pytest.fixture(autouse=True)
+def use_sqlite_for_tests(monkeypatch):
+    """Force all tests in this module to use SQLite instead of PostgreSQL."""
+    monkeypatch.setenv("DATABASE_TYPE", "sqlite")
 
 
 @pytest.fixture

@@ -1,4 +1,9 @@
-"""Shared constants for the git-reading application."""
+"""Shared constants for the git-reading application.
+
+For environment-based configuration (database settings, etc.), use the env module:
+    from common.env import env
+    db_type = env.database_type()
+"""
 
 from pathlib import Path
 

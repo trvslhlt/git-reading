@@ -1,10 +1,19 @@
 # Database Loading Guide
 
-This guide explains how to load data from extraction files into SQLite database storage.
+This guide explains how to load data from extraction files into database storage.
+
+## Database Backend Support
+
+Git-reading supports two database backends:
+
+- **PostgreSQL** (default): Production-ready, scalable, with connection pooling
+- **SQLite**: Simple, file-based, zero-configuration fallback
+
+Both backends provide the same functionality through a unified adapter interface.
 
 ## Why Use a Database?
 
-The SQLite database provides several advantages over the single JSON file:
+Database storage provides several advantages over JSON files:
 
 1. **Structured Queries**: Use SQL to query books, authors, genres, and relationships
 2. **Better Performance**: Indexed lookups for filtering and joins
@@ -34,19 +43,84 @@ The database includes the following tables:
 - Hierarchical genre taxonomy (parent_id)
 - Ready for enrichment with external metadata
 
+## Choosing a Database Backend
+
+### PostgreSQL (Default)
+
+PostgreSQL provides better performance and scalability.
+
+#### Setup
+
+1. **Start PostgreSQL** (via Docker):
+   ```bash
+   make postgres-up
+   ```
+
+2. **Install PostgreSQL dependencies**:
+   ```bash
+   make postgres-install
+   ```
+
+3. **Configure environment variables** (create a `.env` file):
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` if needed (defaults are fine for local development):
+   ```bash
+   DATABASE_TYPE=postgresql  # Default
+   POSTGRES_HOST=localhost
+   POSTGRES_PORT=5432
+   POSTGRES_DB=git_reading
+   POSTGRES_USER=git_reading_user
+   POSTGRES_PASSWORD=dev_password
+   ```
+
+4. **Load data**:
+   ```bash
+   make run-load ARGS='--index-dir data/index --database readings'
+   ```
+
+#### Docker Commands
+
+```bash
+make postgres-up       # Start PostgreSQL container
+make postgres-down     # Stop PostgreSQL (preserves data)
+make postgres-logs     # View container logs
+make postgres-status   # Check health
+make postgres-psql     # Open PostgreSQL CLI
+make postgres-clean    # Remove container and data (with confirmation)
+```
+
+### SQLite (Fallback)
+
+SQLite requires no setup and works out of the box:
+
+```bash
+# Switch to SQLite
+export DATABASE_TYPE=sqlite
+make run-load ARGS='--index-dir data/index --database data/readings.db'
+```
+
+No dependencies needed - just specify the database file path.
+
 ## Loading Process
 
 ### Step 1: Load the Data
 
 ```bash
-# Load with default paths
+# PostgreSQL (default)
+make run-load ARGS='--index-dir data/index --database readings'
+
+# SQLite (if DATABASE_TYPE=sqlite is set)
+export DATABASE_TYPE=sqlite
 make run-load ARGS='--index-dir data/index --database data/readings.db'
 
 # Force overwrite existing database
-make run-load ARGS='--index-dir data/index --database data/readings.db --force'
+make run-load ARGS='--index-dir data/index --database readings --force'
 
 # Incremental update
-make run-load ARGS='--index-dir data/index --database data/readings.db --incremental'
+make run-load ARGS='--index-dir data/index --database readings --incremental'
 ```
 
 ### Step 2: Verify Load
@@ -209,6 +283,30 @@ After loading, you can:
 
 4. **Vector Search**: Use [vector_store_db.py](../src/query/vector_store_db.py) for database-backed semantic search
 
+## Testing
+
+### Running Tests
+
+The test suite includes both unit tests and integration tests:
+
+```bash
+# Run all tests (PostgreSQL integration tests skipped by default)
+make test
+
+# Run with PostgreSQL integration tests (requires running PostgreSQL)
+make postgres-up  # Start PostgreSQL
+RUN_POSTGRES_TESTS=1 make test
+```
+
+**Test breakdown:**
+- **Unit tests** (20 tests): Always run, no database required
+  - SQLite adapter tests (11 tests)
+  - Database factory tests (5 tests)
+  - PostgreSQL factory tests (4 tests - no database needed)
+
+- **Integration tests** (11 tests): Require `RUN_POSTGRES_TESTS=1`
+  - PostgreSQL adapter tests (11 tests - require running database)
+
 ## Troubleshooting
 
 ### Load fails: "Index directory not found"
@@ -231,6 +329,16 @@ Check the error message. Common issues:
 - Corrupted JSON file
 - Unexpected data structure
 - Disk space issues
+
+### PostgreSQL connection fails
+
+Check that PostgreSQL is running and accessible:
+```bash
+make postgres-status  # Check Docker container status
+make postgres-logs    # View PostgreSQL logs
+```
+
+Verify your `.env` file has correct credentials (copy from `.env.example` if needed).
 
 ## File Locations
 
