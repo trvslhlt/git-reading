@@ -263,7 +263,7 @@ The `chunks` table includes a `faiss_index` column that maps to positions in the
 - **chunks.faiss_index = 1** → Second embedding in FAISS
 - etc.
 
-This allows the database-backed vector store ([src/query/vector_store_db.py](../src/query/vector_store_db.py)) to:
+This enables efficient vector search with SQL-based filtering:
 
 1. Filter chunks using SQL (by author, book, section, genre)
 2. Extract only the relevant FAISS indices
@@ -289,7 +289,7 @@ After loading, you can:
    - Favorite genres
    - Reading trends over time
 
-4. **Vector Search**: Use [vector_store_db.py](../src/query/vector_store_db.py) for database-backed semantic search
+4. **Vector Search**: Use the query module for semantic search of your notes
 
 ## Testing
 
@@ -353,4 +353,4 @@ Verify your `.env` file has correct credentials (copy from `.env.example` if nee
 - **Schema**: [src/load/db_schema.py](../src/load/db_schema.py)
 - **Loading**: [src/load/load_data.py](../src/load/load_data.py)
 - **CLI**: [src/load/cli.py](../src/load/cli.py)
-- **DB Vector Store**: [src/query/vector_store_db.py](../src/query/vector_store_db.py)
+- **Vector Search**: [src/query/vector_store.py](../src/query/vector_store.py)
