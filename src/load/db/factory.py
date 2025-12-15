@@ -124,27 +124,18 @@ def create_database(config: DatabaseConfig) -> DatabaseAdapter:
         raise ValueError(f"Unsupported database type: {config.db_type}")
 
 
-def get_adapter(db_identifier: str | Path | None = None) -> DatabaseAdapter:
+def get_adapter() -> DatabaseAdapter:
     """Get database adapter using environment configuration.
 
     This is a convenience function that reads DATABASE_TYPE from environment
     and creates the appropriate adapter with environment-based configuration.
 
-    Args:
-        db_identifier: Optional database identifier override
-            - For SQLite: Path to .db file (e.g., "data/readings.db")
-            - For PostgreSQL: Database name (e.g., "git_reading")
-            - If None, uses default from environment (DATABASE_PATH or POSTGRES_DB)
-
     Returns:
         Configured database adapter
 
     Example:
-        >>> # Uses env vars for everything (PostgreSQL by default)
+        >>> # Uses env vars for everything
         >>> adapter = get_adapter()
-        >>>
-        >>> # Override database name/path
-        >>> adapter = get_adapter("custom_readings")
     """
     from common.env import env
 
@@ -155,7 +146,7 @@ def get_adapter(db_identifier: str | Path | None = None) -> DatabaseAdapter:
             db_type="postgresql",
             host=env.postgres_host(),
             port=env.postgres_port(),
-            database=str(db_identifier) if db_identifier else env.postgres_database(),
+            database=env.postgres_database(),
             user=env.postgres_user(),
             password=env.postgres_password(),
             pool_size=env.postgres_pool_size(),
@@ -163,11 +154,6 @@ def get_adapter(db_identifier: str | Path | None = None) -> DatabaseAdapter:
         )
     else:
         # SQLite
-        if db_identifier:
-            db_path = Path(db_identifier)
-        else:
-            db_path = env.database_path()
-
-        config = DatabaseConfig(db_type="sqlite", db_path=db_path)
+        config = DatabaseConfig(db_type="sqlite", db_path=env.database_path())
 
     return create_database(config)
