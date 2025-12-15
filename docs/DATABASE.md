@@ -241,19 +241,17 @@ LIMIT 10;
 ### Using Python
 
 ```python
-from load.db_schema import get_connection
+from load.db import get_adapter
 
-# Connect to database
-conn = get_connection('.tmp/readings.db')
-cursor = conn.cursor()
-
-# Query authors
-cursor.execute("SELECT name FROM authors ORDER BY name")
-for row in cursor.fetchall():
-    print(row['name'])
-
-conn.close()
+# Connect to database using context manager
+with get_adapter() as adapter:
+    # Query authors
+    results = adapter.fetchall("SELECT name FROM authors ORDER BY name")
+    for row in results:
+        print(row['name'])
 ```
+
+Note: Database configuration is read from environment variables. The context manager automatically handles connection, commit, and cleanup.
 
 ## Integration with Vector Search
 
@@ -350,7 +348,7 @@ Verify your `.env` file has correct credentials (copy from `.env.example` if nee
 
 ## File Locations
 
-- **Schema**: [src/load/db_schema.py](../src/load/db_schema.py)
+- **Database Adapters**: [src/load/db/](../src/load/db/) - Database abstraction layer (SQLite & PostgreSQL)
 - **Loading**: [src/load/load_data.py](../src/load/load_data.py)
 - **CLI**: [src/load/cli.py](../src/load/cli.py)
 - **Vector Search**: [src/query/vector_store.py](../src/query/vector_store.py)
