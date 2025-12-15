@@ -241,19 +241,17 @@ LIMIT 10;
 ### Using Python
 
 ```python
-from load.db_schema import get_connection
+from load.db import get_adapter
 
-# Connect to database
-conn = get_connection('.tmp/readings.db')
-cursor = conn.cursor()
-
-# Query authors
-cursor.execute("SELECT name FROM authors ORDER BY name")
-for row in cursor.fetchall():
-    print(row['name'])
-
-conn.close()
+# Connect to database using context manager
+with get_adapter() as adapter:
+    # Query authors
+    results = adapter.fetchall("SELECT name FROM authors ORDER BY name")
+    for row in results:
+        print(row['name'])
 ```
+
+Note: Database configuration is read from environment variables. The context manager automatically handles connection, commit, and cleanup.
 
 ## Integration with Vector Search
 
@@ -263,7 +261,7 @@ The `chunks` table includes a `faiss_index` column that maps to positions in the
 - **chunks.faiss_index = 1** → Second embedding in FAISS
 - etc.
 
-This allows the database-backed vector store ([src/query/vector_store_db.py](../src/query/vector_store_db.py)) to:
+This enables efficient vector search with SQL-based filtering:
 
 1. Filter chunks using SQL (by author, book, section, genre)
 2. Extract only the relevant FAISS indices
@@ -289,7 +287,7 @@ After loading, you can:
    - Favorite genres
    - Reading trends over time
 
-4. **Vector Search**: Use [vector_store_db.py](../src/query/vector_store_db.py) for database-backed semantic search
+4. **Vector Search**: Use the query module for semantic search of your notes
 
 ## Testing
 
@@ -350,7 +348,7 @@ Verify your `.env` file has correct credentials (copy from `.env.example` if nee
 
 ## File Locations
 
-- **Schema**: [src/load/db_schema.py](../src/load/db_schema.py)
+- **Database Adapters**: [src/load/db/](../src/load/db/) - Database abstraction layer (SQLite & PostgreSQL)
 - **Loading**: [src/load/load_data.py](../src/load/load_data.py)
 - **CLI**: [src/load/cli.py](../src/load/cli.py)
-- **DB Vector Store**: [src/query/vector_store_db.py](../src/query/vector_store_db.py)
+- **Vector Search**: [src/query/vector_store.py](../src/query/vector_store.py)

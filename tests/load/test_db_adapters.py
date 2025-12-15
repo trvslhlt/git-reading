@@ -303,18 +303,6 @@ class TestDatabaseFactory:
         adapter = get_adapter()
         assert isinstance(adapter, SQLiteAdapter)
 
-    def test_get_adapter_sqlite_with_override(self, monkeypatch, tmp_path):
-        """Test get_adapter() with explicit db_identifier override."""
-        from load.db import get_adapter
-
-        monkeypatch.setenv("DATABASE_TYPE", "sqlite")
-        monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "default.db"))
-
-        # Override with custom path
-        adapter = get_adapter(tmp_path / "custom.db")
-        assert isinstance(adapter, SQLiteAdapter)
-        assert adapter.db_path == tmp_path / "custom.db"
-
     def test_get_adapter_postgresql(self, monkeypatch):
         """Test get_adapter() creates PostgreSQL adapter from env."""
         pytest.importorskip("psycopg")
@@ -329,23 +317,6 @@ class TestDatabaseFactory:
         monkeypatch.setenv("POSTGRES_PASSWORD", "test_pass")
 
         adapter = get_adapter()
-        assert isinstance(adapter, PostgreSQLAdapter)
-
-    def test_get_adapter_postgresql_with_override(self, monkeypatch):
-        """Test get_adapter() with explicit database name override."""
-        pytest.importorskip("psycopg")
-
-        from load.db import get_adapter
-
-        monkeypatch.setenv("DATABASE_TYPE", "postgresql")
-        monkeypatch.setenv("POSTGRES_HOST", "localhost")
-        monkeypatch.setenv("POSTGRES_PORT", "5432")
-        monkeypatch.setenv("POSTGRES_DB", "default_db")
-        monkeypatch.setenv("POSTGRES_USER", "test_user")
-        monkeypatch.setenv("POSTGRES_PASSWORD", "test_pass")
-
-        # Override with custom database name
-        adapter = get_adapter("custom_db")
         assert isinstance(adapter, PostgreSQLAdapter)
 
 

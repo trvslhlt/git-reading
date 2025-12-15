@@ -9,8 +9,7 @@ from pathlib import Path
 
 from common.logger import get_logger
 from extract.replay import get_latest_extraction, get_new_extractions_since, replay_all_extractions
-from load.db import DatabaseAdapter, IntegrityError
-from load.db_schema import create_database, get_connection
+from load.db import DatabaseAdapter, IntegrityError, get_adapter
 
 from .db_utils import generate_author, generate_author_id, generate_book_id
 
@@ -93,113 +92,109 @@ def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = F
 
     # For force flag, drop existing schema first
     if force:
-        adapter = get_connection()
-        adapter.drop_schema()
-        adapter.close()
+        with get_adapter() as adapter:
+            adapter.drop_schema()
 
-    create_database()
+    # Create schema
+    with get_adapter() as adapter:
+        adapter.create_schema()
 
     # Connect and load
-    adapter = get_connection()
+    with get_adapter() as adapter:
+        # Track unique books and authors
+        books_seen: dict[str, dict] = {}
+        authors_seen: dict[str, str] = {}  # name -> id mapping
 
-    # Track unique books and authors
-    books_seen: dict[str, dict] = {}
-    authors_seen: dict[str, str] = {}  # name -> id mapping
+        logger.info("Loading data...")
 
-    logger.info("Loading data...")
+        for i, item in enumerate(items):
+            # Extract data from item
+            title = item.book_title
+            author_first_name = item.author_first_name
+            author_last_name = item.author_last_name
+            author = generate_author(author_first_name, author_last_name)
+            section = item.section
+            excerpt = item.content
 
-    for i, item in enumerate(items):
-        # Extract data from item
-        title = item.book_title
-        author_first_name = item.author_first_name
-        author_last_name = item.author_last_name
-        author = generate_author(author_first_name, author_last_name)
-        section = item.section
-        excerpt = item.content
+            # Generate IDs
+            author_id = generate_author_id(author)
+            book_id = generate_book_id(title, author)
 
-        # Generate IDs
-        author_id = generate_author_id(author)
-        book_id = generate_book_id(title, author)
+            # Insert author if not seen
+            if author not in authors_seen:
+                try:
+                    adapter.execute(
+                        """
+                        INSERT INTO authors (id, first_name, last_name, name)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(name) DO UPDATE SET
+                            first_name=excluded.first_name,
+                            last_name=excluded.last_name
+                    """,
+                        (author_id, author_first_name, author_last_name, author),
+                    )
+                    authors_seen[author] = author_id
+                except IntegrityError:
+                    # Author already exists
+                    authors_seen[author] = author_id
 
-        # Insert author if not seen
-        if author not in authors_seen:
-            try:
-                adapter.execute(
-                    """
-                    INSERT INTO authors (id, first_name, last_name, name)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(name) DO UPDATE SET
-                        first_name=excluded.first_name,
-                        last_name=excluded.last_name
-                """,
-                    (author_id, author_first_name, author_last_name, author),
-                )
-                authors_seen[author] = author_id
-            except IntegrityError:
-                # Author already exists
-                authors_seen[author] = author_id
+            # Insert book if not seen
+            if book_id not in books_seen:
+                try:
+                    adapter.execute(
+                        """
+                        INSERT INTO books (id, title)
+                        VALUES (?, ?)
+                        ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
+                    """,
+                        (book_id, title),
+                    )
+                    books_seen[book_id] = {"title": title, "author": author}
 
-        # Insert book if not seen
-        if book_id not in books_seen:
-            try:
-                adapter.execute(
-                    """
-                    INSERT INTO books (id, title)
-                    VALUES (?, ?)
-                    ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
-                """,
-                    (book_id, title),
-                )
-                books_seen[book_id] = {"title": title, "author": author}
+                    # Link book to author
+                    adapter.execute(
+                        """
+                        INSERT INTO book_authors (book_id, author_id)
+                        VALUES (?, ?)
+                        ON CONFLICT DO NOTHING
+                    """,
+                        (book_id, author_id),
+                    )
+                except IntegrityError:
+                    # Book already exists
+                    pass
 
-                # Link book to author
-                adapter.execute(
-                    """
-                    INSERT INTO book_authors (book_id, author_id)
-                    VALUES (?, ?)
-                    ON CONFLICT DO NOTHING
-                """,
-                    (book_id, author_id),
-                )
-            except IntegrityError:
-                # Book already exists
-                pass
+            # Insert note with item_id
+            adapter.execute(
+                """
+                INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
+                VALUES (?, ?, ?, ?, ?)
+            """,
+                (item.item_id, book_id, section, excerpt, i),
+            )
 
-        # Insert note with item_id
-        adapter.execute(
-            """
-            INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
-            VALUES (?, ?, ?, ?, ?)
-        """,
-            (item.item_id, book_id, section, excerpt, i),
-        )
+            if (i + 1) % 500 == 0:
+                logger.debug(f"  Processed {i + 1}/{len(items)} items...")
 
-        if (i + 1) % 500 == 0:
-            logger.debug(f"  Processed {i + 1}/{len(items)} items...")
+        # Store checkpoint (get latest extraction's commit hash)
+        latest_extraction = get_latest_extraction(index_dir)
+        if latest_extraction:
+            store_checkpoint(adapter, latest_extraction.extraction_metadata.git_commit_hash)
 
-    # Store checkpoint (get latest extraction's commit hash)
-    latest_extraction = get_latest_extraction(index_dir)
-    if latest_extraction:
-        store_checkpoint(adapter, latest_extraction.extraction_metadata.git_commit_hash)
+        # Print summary
+        result = adapter.fetchone("SELECT COUNT(*) FROM books")
+        book_count = result[list(result.keys())[0]]
 
-    adapter.commit()
+        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
+        author_count = result[list(result.keys())[0]]
 
-    # Print summary
-    result = adapter.fetchone("SELECT COUNT(*) FROM books")
-    book_count = result[list(result.keys())[0]]
+        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
+        note_count = result[list(result.keys())[0]]
 
-    result = adapter.fetchone("SELECT COUNT(*) FROM authors")
-    author_count = result[list(result.keys())[0]]
-
-    result = adapter.fetchone("SELECT COUNT(*) FROM notes")
-    note_count = result[list(result.keys())[0]]
-
-    logger.info("\n[green]✓[/green] Load complete!")
-    logger.info(f"  Books: [bold]{book_count}[/bold]")
-    logger.info(f"  Authors: [bold]{author_count}[/bold]")
-    logger.info(f"  Notes: [bold]{note_count}[/bold]")
-
-    adapter.close()
+        logger.info("\n[green]✓[/green] Load complete!")
+        logger.info(f"  Books: [bold]{book_count}[/bold]")
+        logger.info(f"  Authors: [bold]{author_count}[/bold]")
+        logger.info(f"  Notes: [bold]{note_count}[/bold]")
 
 
 def load_incremental(index_dir: Path, verbose: bool = True) -> None:
@@ -218,121 +213,114 @@ def load_incremental(index_dir: Path, verbose: bool = True) -> None:
     index_dir = Path(index_dir)
 
     # Check if database exists
-    from load.db import get_adapter
-
     check_adapter = get_adapter()
     if not check_adapter.exists():
         raise ValueError("Database not found or has no tables. Run full load first.")
 
     # Connect to database
-    adapter = get_connection()
+    with get_adapter() as adapter:
+        # Get last processed commit
+        last_commit = get_checkpoint(adapter)
+        if not last_commit:
+            raise ValueError("No checkpoint found in database. Run full load first.")
 
-    # Get last processed commit
-    last_commit = get_checkpoint(adapter)
-    if not last_commit:
-        adapter.close()
-        raise ValueError("No checkpoint found in database. Run full load first.")
+        logger.info(f"Last processed commit: {last_commit[:7]}")
 
-    logger.info(f"Last processed commit: {last_commit[:7]}")
+        # Get new extractions since checkpoint
+        new_extractions = get_new_extractions_since(index_dir, last_commit)
 
-    # Get new extractions since checkpoint
-    new_extractions = get_new_extractions_since(index_dir, last_commit)
+        if not new_extractions:
+            logger.info("[green]✓[/green] No new extractions to process")
+            return
 
-    if not new_extractions:
-        logger.info("[green]✓[/green] No new extractions to process")
-        adapter.close()
-        return
+        logger.info(f"Found [bold]{len(new_extractions)}[/bold] new extraction(s)")
 
-    logger.info(f"Found [bold]{len(new_extractions)}[/bold] new extraction(s)")
+        # Track stats
+        adds = 0
+        updates = 0
+        deletes = 0
 
-    # Track stats
-    adds = 0
-    updates = 0
-    deletes = 0
+        # Process each extraction
+        for extraction in new_extractions:
+            logger.debug(
+                f"Processing extraction: {extraction.extraction_metadata.git_commit_hash[:7]}"
+            )
 
-    # Process each extraction
-    for extraction in new_extractions:
-        logger.debug(f"Processing extraction: {extraction.extraction_metadata.git_commit_hash[:7]}")
+            for item in extraction.items:
+                author = generate_author(item.author_first_name, item.author_last_name)
+                author_id = generate_author_id(author)
+                book_id = generate_book_id(item.book_title, author)
 
-        for item in extraction.items:
-            author = generate_author(item.author_first_name, item.author_last_name)
-            author_id = generate_author_id(author)
-            book_id = generate_book_id(item.book_title, author)
+                if item.operation == "add":
+                    # Ensure author exists
+                    adapter.execute(
+                        """
+                        INSERT INTO authors (id, first_name, last_name, name)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(name) DO NOTHING
+                    """,
+                        (author_id, item.author_first_name, item.author_last_name, author),
+                    )
 
-            if item.operation == "add":
-                # Ensure author exists
-                adapter.execute(
-                    """
-                    INSERT INTO authors (id, first_name, last_name, name)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(name) DO NOTHING
-                """,
-                    (author_id, item.author_first_name, item.author_last_name, author),
-                )
+                    # Ensure book exists
+                    adapter.execute(
+                        """
+                        INSERT INTO books (id, title)
+                        VALUES (?, ?)
+                        ON CONFLICT(id) DO NOTHING
+                    """,
+                        (book_id, item.book_title),
+                    )
 
-                # Ensure book exists
-                adapter.execute(
-                    """
-                    INSERT INTO books (id, title)
-                    VALUES (?, ?)
-                    ON CONFLICT(id) DO NOTHING
-                """,
-                    (book_id, item.book_title),
-                )
+                    # Link book to author
+                    adapter.execute(
+                        """
+                        INSERT INTO book_authors (book_id, author_id)
+                        VALUES (?, ?)
+                        ON CONFLICT DO NOTHING
+                    """,
+                        (book_id, author_id),
+                    )
 
-                # Link book to author
-                adapter.execute(
-                    """
-                    INSERT INTO book_authors (book_id, author_id)
-                    VALUES (?, ?)
-                    ON CONFLICT DO NOTHING
-                """,
-                    (book_id, author_id),
-                )
+                    # Get next faiss_index
+                    result = adapter.fetchone("SELECT MAX(faiss_index) FROM notes")
+                    max_index = result[list(result.keys())[0]] if result else None
+                    next_index = (max_index + 1) if max_index is not None else 0
 
-                # Get next faiss_index
-                result = adapter.fetchone("SELECT MAX(faiss_index) FROM notes")
-                max_index = result[list(result.keys())[0]] if result else None
-                next_index = (max_index + 1) if max_index is not None else 0
+                    # Insert new note
+                    adapter.execute(
+                        """
+                        INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
+                        VALUES (?, ?, ?, ?, ?)
+                    """,
+                        (item.item_id, book_id, item.section, item.content, next_index),
+                    )
+                    adds += 1
 
-                # Insert new note
-                adapter.execute(
-                    """
-                    INSERT INTO notes (item_id, book_id, section, excerpt, faiss_index)
-                    VALUES (?, ?, ?, ?, ?)
-                """,
-                    (item.item_id, book_id, item.section, item.content, next_index),
-                )
-                adds += 1
+                elif item.operation == "update":
+                    # Update existing note
+                    adapter.execute(
+                        """
+                        UPDATE notes
+                        SET section = ?, excerpt = ?
+                        WHERE item_id = ?
+                    """,
+                        (item.section, item.content, item.item_id),
+                    )
+                    updates += 1
 
-            elif item.operation == "update":
-                # Update existing note
-                adapter.execute(
-                    """
-                    UPDATE notes
-                    SET section = ?, excerpt = ?
-                    WHERE item_id = ?
-                """,
-                    (item.section, item.content, item.item_id),
-                )
-                updates += 1
+                elif item.operation == "delete":
+                    # Delete note
+                    adapter.execute("DELETE FROM notes WHERE item_id = ?", (item.item_id,))
+                    deletes += 1
 
-            elif item.operation == "delete":
-                # Delete note
-                adapter.execute("DELETE FROM notes WHERE item_id = ?", (item.item_id,))
-                deletes += 1
+            # Update checkpoint after each extraction
+            store_checkpoint(adapter, extraction.extraction_metadata.git_commit_hash)
 
-        # Update checkpoint after each extraction
-        store_checkpoint(adapter, extraction.extraction_metadata.git_commit_hash)
-
-    adapter.commit()
-
-    logger.info("\n[green]✓[/green] Incremental load complete!")
-    logger.info(f"  Adds: [bold]{adds}[/bold]")
-    logger.info(f"  Updates: [bold]{updates}[/bold]")
-    logger.info(f"  Deletes: [bold]{deletes}[/bold]")
-
-    adapter.close()
+        logger.info("\n[green]✓[/green] Incremental load complete!")
+        logger.info(f"  Adds: [bold]{adds}[/bold]")
+        logger.info(f"  Updates: [bold]{updates}[/bold]")
+        logger.info(f"  Deletes: [bold]{deletes}[/bold]")
 
 
 if __name__ == "__main__":
