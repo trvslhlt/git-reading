@@ -207,13 +207,13 @@ def load_incremental(index_dir: Path, verbose: bool = True) -> None:
     _set_log_level(verbose)
     index_dir = Path(index_dir)
 
-    # Check if database exists
-    check_adapter = get_adapter()
-    if not check_adapter.exists():
+    # Check if database exists (before connecting)
+    adapter = get_adapter()
+    if not adapter.exists():
         raise ValueError("Database not found or has no tables. Run full load first.")
 
     # Connect to database
-    with get_adapter() as adapter:
+    with adapter:
         # Get last processed commit
         last_commit = get_checkpoint(adapter)
         if not last_commit:

@@ -24,25 +24,24 @@ def cmd_load(args):
         print("Run 'extract readings' first to create extraction files.")
         sys.exit(1)
 
-    # Create adapter using .env configuration
-    adapter = get_adapter()
-
     if args.incremental:
-        # Incremental update mode
-        if not adapter.exists():
-            print("Error: Database not found or has no tables")
-            print("Run full load first (without --incremental).")
+        # Incremental update mode - let load_incremental handle validation
+        try:
+            load_incremental(index_dir, verbose=True)
+        except ValueError as e:
+            print(f"Error: {e}")
             sys.exit(1)
-        load_incremental(index_dir, verbose=True)
     else:
         # Full rebuild mode
+        adapter = get_adapter()
         if adapter.exists() and not args.force:
             print("Error: Database already exists")
             print("Use --force to overwrite or --incremental to update.")
             sys.exit(1)
 
         if args.force and adapter.exists():
-            adapter.delete()
+            with get_adapter() as adapter:
+                adapter.delete()
             print("Removed existing database")
 
         load_from_extractions(index_dir, verbose=True, force=False)
