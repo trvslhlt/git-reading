@@ -182,14 +182,9 @@ def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = F
             store_checkpoint(adapter, latest_extraction.extraction_metadata.git_commit_hash)
 
         # Print summary
-        result = adapter.fetchone("SELECT COUNT(*) FROM books")
-        book_count = result[list(result.keys())[0]]
-
-        result = adapter.fetchone("SELECT COUNT(*) FROM authors")
-        author_count = result[list(result.keys())[0]]
-
-        result = adapter.fetchone("SELECT COUNT(*) FROM notes")
-        note_count = result[list(result.keys())[0]]
+        book_count = adapter.fetchscalar("SELECT COUNT(*) FROM books")
+        author_count = adapter.fetchscalar("SELECT COUNT(*) FROM authors")
+        note_count = adapter.fetchscalar("SELECT COUNT(*) FROM notes")
 
         logger.info("\n[green]✓[/green] Load complete!")
         logger.info(f"  Books: [bold]{book_count}[/bold]")
@@ -283,8 +278,7 @@ def load_incremental(index_dir: Path, verbose: bool = True) -> None:
                     )
 
                     # Get next faiss_index
-                    result = adapter.fetchone("SELECT MAX(faiss_index) FROM notes")
-                    max_index = result[list(result.keys())[0]] if result else None
+                    max_index = adapter.fetchscalar("SELECT MAX(faiss_index) FROM notes")
                     next_index = (max_index + 1) if max_index is not None else 0
 
                     # Insert new note
