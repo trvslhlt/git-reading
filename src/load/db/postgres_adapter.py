@@ -274,6 +274,14 @@ class PostgreSQLAdapter(DatabaseAdapter):
         # psycopg with dict_row already returns dicts
         return [dict(row) for row in rows]
 
+    def fetchscalar(self, query: str, params: tuple | None = None) -> Any:
+        """Execute query and return first column of first row."""
+        result = self.fetchone(query, params)
+        if result is None:
+            return None
+        # Get first value from the dictionary
+        return result[list(result.keys())[0]]
+
     def cursor(self) -> Any:
         """Get raw database cursor for complex operations."""
         if not self._conn:

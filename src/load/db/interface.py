@@ -140,6 +140,24 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    def fetchscalar(self, query: str, params: tuple | None = None) -> Any:
+        """Execute query and return first column of first row.
+
+        Useful for queries that return a single value like COUNT(*), MAX(), etc.
+
+        Args:
+            query: SQL query to execute
+            params: Query parameters (optional)
+
+        Returns:
+            First column of first row, or None if no results
+
+        Raises:
+            DatabaseError: If execution fails
+        """
+        pass
+
+    @abstractmethod
     def cursor(self) -> Any:
         """Get raw database cursor for complex operations.
 
