@@ -47,13 +47,17 @@ class TestSQLiteAdapter:
         tables = adapter.get_tables()
         expected_tables = [
             "author_influences",
+            "author_movements",
             "authors",
             "book_authors",
-            "book_genres",
+            "book_subjects",
             "books",
-            "genres",
+            "enrichment_log",
+            "literary_movements",
+            "manual_tags",
             "metadata",
             "notes",
+            "subjects",
         ]
         # Filter out sqlite_sequence (created automatically for AUTOINCREMENT)
         tables = [t for t in tables if t != "sqlite_sequence"]
@@ -392,13 +396,17 @@ class TestPostgreSQLAdapter:
         tables = pg_adapter.get_tables()
         expected_tables = [
             "author_influences",
+            "author_movements",
             "authors",
             "book_authors",
-            "book_genres",
+            "book_subjects",
             "books",
-            "genres",
+            "enrichment_log",
+            "literary_movements",
+            "manual_tags",
             "metadata",
             "notes",
+            "subjects",
         ]
         assert sorted(tables) == expected_tables
 

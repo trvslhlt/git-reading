@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "rich>=13.0.0",  # Beautiful CLI output and logging
     "python-dotenv>=1.0.0",  # Load environment variables from .env file
+    "requests>=2.31.0",  # HTTP library for API clients
 ]
 
 [project.optional-dependencies]
@@ -46,6 +47,7 @@ extract = "extract.cli:main"
 normalize = "normalize_source.cli:main"
 search = "query.cli:main"
 load-db = "load.cli:main"
+enrich-db = "enrich.cli:main"
 
 [build-system]
 requires = ["hatchling"]

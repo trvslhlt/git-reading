@@ -292,14 +292,44 @@ def load_incremental(index_dir: Path, verbose: bool = True) -> None:
                     adds += 1
 
                 elif item.operation == "update":
-                    # Update existing note
+                    # Ensure author exists (in case name changed)
+                    adapter.execute(
+                        """
+                        INSERT INTO authors (id, first_name, last_name, name)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT(name) DO NOTHING
+                    """,
+                        (author_id, item.author_first_name, item.author_last_name, author),
+                    )
+
+                    # Ensure book exists (in case title changed)
+                    adapter.execute(
+                        """
+                        INSERT INTO books (id, title)
+                        VALUES (?, ?)
+                        ON CONFLICT(id) DO NOTHING
+                    """,
+                        (book_id, item.book_title),
+                    )
+
+                    # Link book to author (in case relationship changed)
+                    adapter.execute(
+                        """
+                        INSERT INTO book_authors (book_id, author_id)
+                        VALUES (?, ?)
+                        ON CONFLICT DO NOTHING
+                    """,
+                        (book_id, author_id),
+                    )
+
+                    # Update existing note (including book_id in case title changed)
                     adapter.execute(
                         """
                         UPDATE notes
-                        SET section = ?, excerpt = ?
+                        SET book_id = ?, section = ?, excerpt = ?
                         WHERE item_id = ?
                     """,
-                        (item.section, item.content, item.item_id),
+                        (book_id, item.section, item.content, item.item_id),
                     )
                     updates += 1
 
@@ -310,6 +340,62 @@ def load_incremental(index_dir: Path, verbose: bool = True) -> None:
 
             # Update checkpoint after each extraction
             store_checkpoint(adapter, extraction.extraction_metadata.git_commit_hash)
+
+        # Clean up orphaned records after all updates
+        logger.debug("Cleaning up orphaned records...")
+
+        # Count orphans before cleanup
+        orphaned_books_count = (
+            adapter.fetchscalar(
+                "SELECT COUNT(*) FROM books WHERE id NOT IN (SELECT DISTINCT book_id FROM notes)"
+            )
+            or 0
+        )
+
+        # Delete orphaned books (books with no notes)
+        # IMPORTANT: Do this BEFORE cleaning up book_authors and book_subjects
+        adapter.execute(
+            """
+            DELETE FROM books
+            WHERE id NOT IN (SELECT DISTINCT book_id FROM notes)
+            """
+        )
+
+        # Delete orphaned book_subjects (orphaned by book deletion above)
+        # NOTE: This must happen AFTER deleting orphaned books
+        adapter.execute(
+            """
+            DELETE FROM book_subjects
+            WHERE book_id NOT IN (SELECT id FROM books)
+            """
+        )
+
+        # Delete orphaned book_authors (orphaned by book deletion above)
+        adapter.execute(
+            """
+            DELETE FROM book_authors
+            WHERE book_id NOT IN (SELECT id FROM books)
+            """
+        )
+
+        # Delete orphaned authors (authors with no books)
+        adapter.execute(
+            """
+            DELETE FROM authors
+            WHERE id NOT IN (SELECT DISTINCT author_id FROM book_authors)
+            """
+        )
+
+        # Delete orphaned subjects (subjects with no books)
+        adapter.execute(
+            """
+            DELETE FROM subjects
+            WHERE id NOT IN (SELECT DISTINCT subject_id FROM book_subjects)
+            """
+        )
+
+        if orphaned_books_count > 0:
+            logger.info(f"  Cleaned up {orphaned_books_count} orphaned book(s)")
 
         logger.info("\n[green]✓[/green] Incremental load complete!")
         logger.info(f"  Adds: [bold]{adds}[/bold]")

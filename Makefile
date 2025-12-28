@@ -4,6 +4,7 @@
 .PHONY: help install test test-cov test-cov-report lint format clean \
 	run-extract run-load run-validate run-fix run-learn-patterns \
 	run-search-build run-search-query run-search-stats run-streamlit \
+	run-enrich run-enrich-status run-enrich-export \
 	dev-install streamlit-install search-install postgres-install \
 	streamlit search dev \
 	postgres-up postgres-down postgres-logs postgres-status postgres-psql postgres-clean
@@ -47,6 +48,11 @@ help:
 	@echo "  make run-search-query    - Query the semantic search index (requires: make search-install)"
 	@echo "  make run-search-stats    - Show search index statistics (requires: make search-install)"
 	@echo ""
+	@echo "Enrichment Commands:"
+	@echo "  make run-enrich          - Enrich books with metadata from Open Library"
+	@echo "  make run-enrich-status   - Show enrichment coverage statistics"
+	@echo "  make run-enrich-export   - Export enriched data to CSV/JSON"
+	@echo ""
 	@echo "Visualization:"
 	@echo "  make run-streamlit       - Launch Streamlit app (requires: make streamlit-install)"
 	@echo ""
@@ -63,6 +69,11 @@ help:
 	@echo "  make run-extract ARGS='--notes-dir readings'"
 	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
+	@echo ""
+	@echo "  # Enrich book metadata"
+	@echo "  make run-enrich-status   # Check current enrichment coverage"
+	@echo "  make run-enrich          # Enrich all unenriched books"
+	@echo "  make run-enrich ARGS='--limit 10'  # Test on 10 books first"
 	@echo ""
 	@echo "  # Validate and fix notes"
 	@echo "  make run-validate ARGS='--notes-dir readings --format json --output issues.json'"
@@ -152,7 +163,7 @@ test-cov-report:
 
 lint:
 	@echo "Running linter..."
-	uv run ruff check .
+	uv run ruff check . --exit-non-zero-on-fix
 
 format:
 	@echo "Formatting code..."
@@ -198,33 +209,38 @@ run-extract:
 
 # Load extraction files to database (SQLite or PostgreSQL)
 # REQUIRES ARGS to prevent accidental file operations
-# CLI requires: --index-dir, --database (both required at CLI level)
+# CLI requires: --index-dir (required at CLI level)
 #
-# Database argument interpretation depends on DATABASE_TYPE environment variable:
-#   - SQLite (DATABASE_TYPE=sqlite): Provide file path
-#   - PostgreSQL (DATABASE_TYPE=postgresql): Provide database name
+# Database configuration is read from .env file:
+#   - DATABASE_TYPE: 'sqlite' or 'postgresql'
+#   - DATABASE_PATH: Path to SQLite database file (if using SQLite)
+#   - POSTGRES_*: PostgreSQL connection settings (if using PostgreSQL)
 #
 # Usage:
-#   PostgreSQL (default):
-#     make run-load ARGS='--index-dir data/index --database readings'
-#     make run-load ARGS='--index-dir data/index --database readings --incremental'
+#   # Full rebuild (first time load)
+#   make run-load ARGS='--index-dir data/index'
+#   make run-load ARGS='--index-dir data/index --force'  # Overwrite existing
 #
-#   SQLite:
-#     DATABASE_TYPE=sqlite make run-load ARGS='--index-dir data/index --database data/readings.db'
+#   # Incremental update (requires existing database)
+#   make run-load ARGS='--index-dir data/index --incremental'
 #
-#   Help:
-#     make run-load ARGS='--help'
+#   # Help
+#   make run-load ARGS='--help'
 run-load:
 	@if [ -z "$(ARGS)" ]; then \
 		echo "❌ Error: ARGS required to prevent accidental file operations"; \
 		echo ""; \
-		echo "Usage (depends on DATABASE_TYPE environment variable):"; \
-		echo "  PostgreSQL (default):"; \
-		echo "    make run-load ARGS='--index-dir data/index --database readings'"; \
-		echo "  SQLite:"; \
-		echo "    DATABASE_TYPE=sqlite make run-load ARGS='--index-dir data/index --database data/readings.db'"; \
+		echo "Usage:"; \
+		echo "  Full rebuild:"; \
+		echo "    make run-load ARGS='--index-dir data/index'"; \
+		echo "  Incremental update:"; \
+		echo "    make run-load ARGS='--index-dir data/index --incremental'"; \
+		echo "  Force overwrite:"; \
+		echo "    make run-load ARGS='--index-dir data/index --force'"; \
 		echo "  Help:"; \
 		echo "    make run-load ARGS='--help'"; \
+		echo ""; \
+		echo "Note: Database configuration is read from .env file (DATABASE_TYPE, DATABASE_PATH, POSTGRES_*)"; \
 		exit 1; \
 	fi
 	@echo "Loading to database..."
@@ -306,6 +322,45 @@ run-search-query:
 run-search-stats:
 	@echo "Search index statistics:"
 	PYTHONPATH=src uv run search stats $(ARGS)
+
+#
+# Data Enrichment
+#
+
+# Enrich books with metadata from Open Library
+# Fetches ISBNs, publication info, subjects from external APIs
+# Usage: make run-enrich                           # Enrich all unenriched books
+#        make run-enrich ARGS='--limit 10'         # Enrich first 10 books
+#        make run-enrich ARGS='--batch-size 20'    # Custom batch size
+#        make run-enrich ARGS='--help'             # Show all options
+run-enrich:
+	@echo "Enriching book metadata from Open Library..."
+	PYTHONPATH=src uv run python -m enrich.cli enrich $(ARGS)
+
+# Show enrichment coverage statistics
+# Displays percentage of books with ISBNs, publication years, subjects, etc.
+# Usage: make run-enrich-status
+run-enrich-status:
+	@echo "Checking enrichment status..."
+	PYTHONPATH=src uv run python -m enrich.cli status
+
+# Export enriched data to CSV or JSON
+# Useful for manual review or external analysis
+# Usage: make run-enrich-export ARGS='--output books.csv'
+#        make run-enrich-export ARGS='--output books.json --format json'
+#        make run-enrich-export ARGS='--help'
+run-enrich-export:
+	@if [ -z "$(ARGS)" ]; then \
+		echo "❌ Error: ARGS required with --output parameter"; \
+		echo ""; \
+		echo "Usage:"; \
+		echo "  make run-enrich-export ARGS='--output books.csv'"; \
+		echo "  make run-enrich-export ARGS='--output books.json --format json'"; \
+		echo "  make run-enrich-export ARGS='--help'"; \
+		exit 1; \
+	fi
+	@echo "Exporting enriched data..."
+	PYTHONPATH=src uv run python -m enrich.cli export $(ARGS)
 
 #
 # Visualization
