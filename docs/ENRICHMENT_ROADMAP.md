@@ -44,8 +44,8 @@ This document outlines the phased approach to enriching book metadata in the git
 - ✅ Thematic tags and subjects (with Q-ID → label resolution)
 - ✅ Awards and recognition
 - ✅ Wikipedia URLs and VIAF IDs
+- ✅ Author influence relationships (who influenced whom)
 - ⏳ Translations and editions (schema ready, not yet implemented)
-- ⏳ Influence relationships (schema ready, not yet implemented)
 
 **Implementation Highlights**:
 1. ✅ Wikidata SPARQL API client with rate limiting
@@ -81,9 +81,12 @@ make run-enrich ARGS='--sources wikidata --entity-type both --limit 5'
   - Example: "Q84" → "London", "Q24925" → "Science fiction"
   - Batch resolution (up to 50 Q-IDs per API call)
   - In-memory caching to minimize API requests
-- **Author Enrichment**: Birth/death dates, places, nationality, biography, movements
+- **Author Enrichment**: Birth/death dates, places, nationality, biography, movements, influences
 - **Literary Movements**: Stored for both books and authors with source tracking
 - **Awards**: Book awards captured and stored in dedicated tables
+- **Author Influences**: Bidirectional influence relationships (who influenced whom)
+  - Automatically creates minimal author records for influencers not yet in database
+  - Enables building literary genealogy graphs
 
 **Database Impact**:
 - ✅ Uses `wikidata_id` fields in `books` and `authors` tables
@@ -91,7 +94,7 @@ make run-enrich ARGS='--sources wikidata --entity-type both --limit 5'
 - ✅ `literary_movements` table populated
 - ✅ `book_movements` and `author_movements` tables populated
 - ✅ `awards` and `book_awards` tables populated
-- ⏳ `author_influences` table (exists but not yet populated)
+- ✅ `author_influences` table populated (bidirectional relationships)
 
 ### 2.2 WorldCat/Library of Congress
 

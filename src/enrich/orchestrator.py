@@ -312,12 +312,21 @@ class EnrichmentOrchestrator:
             if movements:
                 self._add_author_movements(author_id, movements, source="wikidata")
 
+            # Handle author influences
+            wikidata_id = normalized_data.get("wikidata_id")
+            influence_count = 0
+            if wikidata_id:
+                influences = self.wikidata_client.get_author_influences(wikidata_id)
+                if influences:
+                    influence_count = self._add_author_influences(author_id, influences)
+
             logger.info(
                 f"✓ Wikidata: "
                 f"ID: {normalized_data.get('wikidata_id', 'N/A')}, "
                 f"Birth: {normalized_data.get('birth_year', 'N/A')}, "
                 f"Death: {normalized_data.get('death_year', 'N/A')}, "
-                f"Movements: {len(movements)}"
+                f"Movements: {len(movements)}, "
+                f"Influences: {influence_count}"
             )
 
             return True
@@ -328,6 +337,11 @@ class EnrichmentOrchestrator:
 
         except Exception as e:
             logger.error(f"✗ Wikidata error for author '{name}': {e}")
+            # Rollback transaction to recover from database errors
+            try:
+                self.adapter.rollback()
+            except Exception:
+                pass
             return False
 
     def _enrich_book_openlibrary(self, book_id: str, title: str, author: str) -> bool:
@@ -716,6 +730,142 @@ class EnrichmentOrchestrator:
             except IntegrityError:
                 # Already exists, that's fine
                 pass
+
+    def _add_author_influences(self, author_id: str, influences: list[dict[str, str]]) -> int:
+        """Add author influence relationships to database.
+
+        Args:
+            author_id: Database ID of the author being enriched
+            influences: List of influence dictionaries from Wikidata client
+                Each dict has:
+                - influencer_id: Wikidata Q-ID of the influencer
+                - influencer_name: Name of the influencer
+                - influenced_id: Wikidata Q-ID of the influenced author
+                - influenced_name: Name of the influenced author
+
+        Returns:
+            Number of influence relationships added
+
+        Note:
+            This method handles bidirectional relationships:
+            - If the author was influenced by someone, stores that relationship
+            - If the author influenced someone else, stores that too
+            - Creates author records for influencers/influenced not yet in database
+        """
+        added_count = 0
+
+        for influence in influences:
+            influencer_id = influence.get("influencer_id")
+            influencer_name = influence.get("influencer_name")
+            influenced_id = influence.get("influenced_id")
+            influenced_name = influence.get("influenced_name")
+
+            if not all([influencer_id, influencer_name, influenced_id, influenced_name]):
+                continue
+
+            # Determine which author is which
+            if influenced_id == self._get_author_wikidata_id(author_id):
+                # This author was influenced by someone
+                influencer_db_id = self._get_or_create_author_from_wikidata(
+                    influencer_id, influencer_name
+                )
+                influenced_db_id = author_id
+            elif influencer_id == self._get_author_wikidata_id(author_id):
+                # This author influenced someone else
+                influenced_db_id = self._get_or_create_author_from_wikidata(
+                    influenced_id, influenced_name
+                )
+                influencer_db_id = author_id
+            else:
+                # This shouldn't happen, but skip if it does
+                logger.warning(
+                    f"Influence relationship doesn't involve author {author_id}: "
+                    f"{influencer_id} -> {influenced_id}"
+                )
+                continue
+
+            # Insert the influence relationship
+            try:
+                self.adapter.execute(
+                    """
+                    INSERT INTO author_influences (influencer_id, influenced_id)
+                    VALUES (?, ?)
+                    ON CONFLICT(influencer_id, influenced_id) DO NOTHING
+                    """,
+                    (influencer_db_id, influenced_db_id),
+                )
+                added_count += 1
+            except IntegrityError:
+                # Already exists, that's fine
+                pass
+
+        return added_count
+
+    def _get_author_wikidata_id(self, author_id: str) -> str | None:
+        """Get the Wikidata ID for an author from the database.
+
+        Args:
+            author_id: Database ID of the author
+
+        Returns:
+            Wikidata Q-ID or None if not set
+        """
+        result = self.adapter.fetchone("SELECT wikidata_id FROM authors WHERE id = ?", (author_id,))
+        return result.get("wikidata_id") if result else None
+
+    def _get_or_create_author_from_wikidata(self, wikidata_id: str, author_name: str) -> str:
+        """Get existing author by Wikidata ID or create a new author record.
+
+        Args:
+            wikidata_id: Wikidata Q-ID for the author
+            author_name: Full name of the author
+
+        Returns:
+            Database ID of the author
+
+        Note:
+            This creates minimal author records for authors encountered through
+            influence relationships but not yet in the database from reading notes.
+            These can be enriched later if the user reads books by those authors.
+        """
+        # Check if author already exists by Wikidata ID
+        existing = self.adapter.fetchone(
+            "SELECT id FROM authors WHERE wikidata_id = ?", (wikidata_id,)
+        )
+
+        if existing:
+            return existing["id"]
+
+        # Parse the name (simple approach: last word is last name)
+        name_parts = author_name.strip().split()
+        if len(name_parts) > 1:
+            first_name = " ".join(name_parts[:-1])
+            last_name = name_parts[-1]
+        else:
+            first_name = None
+            last_name = author_name
+
+        # Generate author ID
+        from load.db_utils import generate_author_id
+
+        author_id = generate_author_id(author_name)
+
+        # Insert minimal author record
+        try:
+            self.adapter.execute(
+                """
+                INSERT INTO authors (id, name, first_name, last_name, wikidata_id)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    wikidata_id = excluded.wikidata_id
+                """,
+                (author_id, author_name, first_name, last_name, wikidata_id),
+            )
+        except IntegrityError:
+            # Author exists, just return the ID
+            pass
+
+        return author_id
 
     def _add_book_awards(self, book_id: str, awards: list[str], source: str) -> None:
         """Add awards to book with source tracking.

@@ -30,6 +30,7 @@ class WikidataClient(APIClient):
 
     SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
     ENTITY_URL = "https://www.wikidata.org/wiki/Special:EntityData/{}.json"
+    SEARCH_API = "https://www.wikidata.org/w/api.php"
 
     def __init__(self, requests_per_minute: int = 60):
         """Initialize Wikidata client.
@@ -130,53 +131,75 @@ class WikidataClient(APIClient):
         """
         self.rate_limiter.wait_if_needed()
 
-        # SPARQL query to find book by title and author
+        # Simplified SPARQL query for better performance
         query = """
-        SELECT ?book ?bookLabel ?authorLabel WHERE {{
-          ?book wdt:P31 wd:Q7725634 .  # instance of: literary work
-          ?book rdfs:label ?title .
-          ?book wdt:P50 ?author .  # author property
+        SELECT ?book WHERE {{
+          ?book wdt:P31 wd:Q7725634 ;  # instance of: literary work
+                wdt:P50 ?author ;  # author property
+                rdfs:label ?title .
           ?author rdfs:label ?authorName .
 
           FILTER(CONTAINS(LCASE(?title), LCASE("{title}")))
           FILTER(CONTAINS(LCASE(?authorName), LCASE("{author}")))
           FILTER(LANG(?title) = "en")
           FILTER(LANG(?authorName) = "en")
-
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
         }}
         LIMIT 1
         """.format(title=title.replace('"', '\\"'), author=author.replace('"', '\\"'))
 
-        try:
-            logger.debug(f"Searching Wikidata for '{title}' by {author}")
-            response = self.session.get(
-                self.SPARQL_ENDPOINT, params={"query": query, "format": "json"}, timeout=30
-            )
-            response.raise_for_status()
+        # Retry logic with exponential backoff
+        max_retries = 3
+        retry_delay = 2
 
-            data = response.json()
-            bindings = data.get("results", {}).get("bindings", [])
+        for attempt in range(max_retries):
+            try:
+                logger.debug(
+                    f"Searching Wikidata for '{title}' by {author} (attempt {attempt + 1}/{max_retries})"
+                )
+                response = self.session.get(
+                    self.SPARQL_ENDPOINT,
+                    params={"query": query, "format": "json"},
+                    timeout=60,  # Increased from 30 to 60 seconds
+                )
+                response.raise_for_status()
 
-            if not bindings:
-                logger.debug(f"No Wikidata results for '{title}' by {author}")
+                data = response.json()
+                bindings = data.get("results", {}).get("bindings", [])
+
+                if not bindings:
+                    logger.debug(f"No Wikidata results for '{title}' by {author}")
+                    return None
+
+                book_uri = bindings[0].get("book", {}).get("value", "")
+                if not book_uri:
+                    return None
+
+                wikidata_id = book_uri.split("/")[-1]
+                logger.debug(f"Found Wikidata entity: {wikidata_id}")
+
+                return self._get_entity_data(wikidata_id)
+
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2**attempt)
+                    logger.warning(
+                        f"Timeout searching for '{title}', retrying in {wait_time}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    import time
+
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.warning(f"Wikidata timeout for '{title}' after {max_retries} attempts")
+                    return None
+            except requests.exceptions.RequestException as e:
+                if hasattr(e, "response") and e.response and e.response.status_code == 429:
+                    raise RateLimitError("Wikidata rate limit exceeded") from e
+                logger.warning(f"Wikidata API error for '{title}': {e}")
                 return None
 
-            book_uri = bindings[0].get("book", {}).get("value", "")
-            if not book_uri:
-                return None
-
-            wikidata_id = book_uri.split("/")[-1]
-            logger.debug(f"Found Wikidata entity: {wikidata_id}")
-
-            return self._get_entity_data(wikidata_id)
-
-        except requests.exceptions.Timeout as e:
-            raise APIError(f"Wikidata API timeout for '{title}'") from e
-        except requests.exceptions.RequestException as e:
-            if hasattr(e, "response") and e.response and e.response.status_code == 429:
-                raise RateLimitError("Wikidata rate limit exceeded") from e
-            raise APIError(f"Wikidata API error: {e}") from e
+        return None
 
     def search_author(self, name: str) -> dict[str, Any] | None:
         """Search for an author by name.
@@ -192,55 +215,167 @@ class WikidataClient(APIClient):
         """
         self.rate_limiter.wait_if_needed()
 
-        # SPARQL query to find author
+        # Simplified SPARQL query for better performance
+        # Just find the Q-number, fetch details separately
         query = """
-        SELECT ?author ?authorLabel ?birthDate ?deathDate ?birthPlace ?deathPlace WHERE {{
-          ?author wdt:P31 wd:Q5 .  # instance of: human
-          ?author wdt:P106 wd:Q36180 .  # occupation: writer
-          ?author rdfs:label ?name .
-
+        SELECT ?author WHERE {{
+          ?author wdt:P31 wd:Q5 ;  # instance of: human
+                  wdt:P106 wd:Q36180 ;  # occupation: writer
+                  rdfs:label ?name .
           FILTER(CONTAINS(LCASE(?name), LCASE("{name}")))
           FILTER(LANG(?name) = "en")
-
-          OPTIONAL {{ ?author wdt:P569 ?birthDate }}
-          OPTIONAL {{ ?author wdt:P570 ?deathDate }}
-          OPTIONAL {{ ?author wdt:P19 ?birthPlace }}
-          OPTIONAL {{ ?author wdt:P20 ?deathPlace }}
-
-          SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
         }}
         LIMIT 1
         """.format(name=name.replace('"', '\\"'))
 
+        # Retry logic with exponential backoff for timeouts
+        max_retries = 3
+        retry_delay = 2  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                logger.debug(
+                    f"Searching Wikidata for author '{name}' (attempt {attempt + 1}/{max_retries})"
+                )
+                response = self.session.get(
+                    self.SPARQL_ENDPOINT,
+                    params={"query": query, "format": "json"},
+                    timeout=60,  # Increased from 30 to 60 seconds
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                bindings = data.get("results", {}).get("bindings", [])
+
+                if not bindings:
+                    logger.debug(f"No Wikidata results for author '{name}'")
+                    return None
+
+                author_uri = bindings[0].get("author", {}).get("value", "")
+                if not author_uri:
+                    return None
+
+                wikidata_id = author_uri.split("/")[-1]
+                logger.debug(f"Found Wikidata entity: {wikidata_id}")
+
+                return self._get_entity_data(wikidata_id)
+
+            except requests.exceptions.Timeout:
+                if attempt < max_retries - 1:
+                    wait_time = retry_delay * (2**attempt)  # Exponential backoff
+                    logger.warning(
+                        f"Timeout searching for '{name}', retrying in {wait_time}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    import time
+
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.warning(
+                        f"Wikidata SPARQL timeout for author '{name}' after {max_retries} attempts"
+                    )
+                    logger.info(f"Falling back to Search API for '{name}'")
+                    return self._search_author_via_api(name)
+            except requests.exceptions.RequestException as e:
+                if hasattr(e, "response") and e.response and e.response.status_code == 429:
+                    raise RateLimitError("Wikidata rate limit exceeded") from e
+                logger.warning(f"Wikidata API error for author '{name}': {e}")
+                return None
+
+        return None
+
+    def _search_author_via_api(self, name: str) -> dict[str, Any] | None:
+        """Search for an author using Wikidata Search API (fallback for SPARQL timeouts).
+
+        This method is faster and more reliable than SPARQL but requires filtering results.
+
+        Args:
+            name: Author name
+
+        Returns:
+            Wikidata entity data or None if not found
+        """
+        self.rate_limiter.wait_if_needed()
+
         try:
-            logger.debug(f"Searching Wikidata for author '{name}'")
-            response = self.session.get(
-                self.SPARQL_ENDPOINT, params={"query": query, "format": "json"}, timeout=30
-            )
+            logger.debug(f"Searching Wikidata via Search API for author '{name}'")
+
+            # Use Wikidata Search API
+            params = {
+                "action": "wbsearchentities",
+                "format": "json",
+                "language": "en",
+                "type": "item",
+                "search": name,
+                "limit": 10,  # Get top 10 results to filter
+            }
+
+            response = self.session.get(self.SEARCH_API, params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
-            bindings = data.get("results", {}).get("bindings", [])
+            search_results = data.get("search", [])
 
-            if not bindings:
-                logger.debug(f"No Wikidata results for author '{name}'")
+            if not search_results:
+                logger.debug(f"No Search API results for author '{name}'")
                 return None
 
-            author_uri = bindings[0].get("author", {}).get("value", "")
-            if not author_uri:
-                return None
+            # Filter results to find writers
+            # Check each result's entity data to see if they're a writer
+            for result in search_results:
+                wikidata_id = result.get("id")
+                if not wikidata_id:
+                    continue
 
-            wikidata_id = author_uri.split("/")[-1]
-            logger.debug(f"Found Wikidata entity: {wikidata_id}")
+                # Fetch full entity data
+                entity_data = self._get_entity_data(wikidata_id)
+                if not entity_data:
+                    continue
 
-            return self._get_entity_data(wikidata_id)
+                # Check if this entity is a human who is a writer
+                claims = entity_data.get("claims", {})
 
-        except requests.exceptions.Timeout as e:
-            raise APIError(f"Wikidata API timeout for author '{name}'") from e
+                # Check instance of (P31) = human (Q5)
+                instance_of = claims.get("P31", [])
+                is_human = any(
+                    claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("id")
+                    == "Q5"
+                    for claim in instance_of
+                )
+
+                if not is_human:
+                    continue
+
+                # Check occupation (P106) includes writer (Q36180) or related
+                occupations = claims.get("P106", [])
+                writer_qids = {
+                    "Q36180",  # writer
+                    "Q6625963",  # novelist
+                    "Q49757",  # poet
+                    "Q214917",  # playwright
+                    "Q4853732",  # essayist
+                    "Q3579035",  # screenwriter
+                }
+
+                is_writer = any(
+                    claim.get("mainsnak", {}).get("datavalue", {}).get("value", {}).get("id")
+                    in writer_qids
+                    for claim in occupations
+                )
+
+                if is_writer:
+                    logger.debug(f"Found author via Search API: {wikidata_id}")
+                    return entity_data
+
+            logger.debug(f"No writer found in Search API results for '{name}'")
+            return None
+
         except requests.exceptions.RequestException as e:
             if hasattr(e, "response") and e.response and e.response.status_code == 429:
                 raise RateLimitError("Wikidata rate limit exceeded") from e
-            raise APIError(f"Wikidata API error: {e}") from e
+            logger.warning(f"Wikidata Search API error for author '{name}': {e}")
+            return None
 
     def _get_entity_data(self, wikidata_id: str) -> dict[str, Any] | None:
         """Fetch full entity data from Wikidata.

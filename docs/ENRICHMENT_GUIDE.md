@@ -90,6 +90,10 @@ make run-enrich ARGS='--sources wikidata --entity-type both'
 - Wikipedia URL
 - VIAF identifier (library standard)
 - Literary movements (e.g., "Bloomsbury Group")
+- Author influences (who influenced this author and who they influenced)
+  - Example: Douglas Adams was influenced by Isaac Asimov
+  - Example: Douglas Adams influenced Terry Pratchett
+  - Automatically creates minimal author records for influencers
 
 ## Advanced Usage
 
@@ -152,6 +156,25 @@ Book enrichment stats:
 **Awards:**
 - `awards` - Award details (name, category, year established)
 - `book_awards` - Links books to awards (with year won)
+
+**Author Influences:**
+- `author_influences` - Bidirectional influence relationships between authors
+  - `influencer_id` - Author who influenced
+  - `influenced_id` - Author who was influenced
+  - Query example: Find who influenced an author
+    ```sql
+    SELECT a.name AS influencer
+    FROM author_influences ai
+    JOIN authors a ON ai.influencer_id = a.id
+    WHERE ai.influenced_id = 'your-author-id';
+    ```
+  - Query example: Find who an author influenced
+    ```sql
+    SELECT a.name AS influenced
+    FROM author_influences ai
+    JOIN authors a ON ai.influenced_id = a.id
+    WHERE ai.influencer_id = 'your-author-id';
+    ```
 
 ### Key Fields
 
