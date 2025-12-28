@@ -8,7 +8,9 @@ from load.db import DatabaseAdapter, IntegrityError, get_adapter
 
 from .clients.base import APIError, NoMatchError
 from .clients.openlibrary import OpenLibraryClient
+from .clients.wikidata import WikidataClient
 from .normalizers.book_normalizer import BookNormalizer
+from .normalizers.wikidata_normalizer import WikidataAuthorNormalizer, WikidataBookNormalizer
 from .source_tracker import SourceTracker
 
 logger = get_logger(__name__)
@@ -21,16 +23,25 @@ class EnrichmentOrchestrator:
     to enrich book and author metadata while tracking data provenance.
     """
 
-    def __init__(self, adapter: DatabaseAdapter | None = None):
+    def __init__(self, adapter: DatabaseAdapter | None = None, sources: list[str] | None = None):
         """Initialize orchestrator.
 
         Args:
             adapter: Database adapter (if None, creates one from env)
+            sources: List of data sources to use (default: ['openlibrary'])
         """
         self.adapter = adapter or get_adapter()
         self.source_tracker = SourceTracker(self.adapter)
-        self.openlibrary_client = OpenLibraryClient()
+        self.sources = sources or ["openlibrary"]
+
+        # Initialize clients based on requested sources
+        self.openlibrary_client = OpenLibraryClient() if "openlibrary" in self.sources else None
+        self.wikidata_client = WikidataClient() if "wikidata" in self.sources else None
+
+        # Initialize normalizers
         self.book_normalizer = BookNormalizer()
+        self.wikidata_book_normalizer = WikidataBookNormalizer()
+        self.wikidata_author_normalizer = WikidataAuthorNormalizer()
 
     def enrich_books(self, limit: int | None = None) -> dict[str, int]:
         """Enrich all unenriched books in the database.
@@ -131,6 +142,38 @@ class EnrichmentOrchestrator:
         return stats
 
     def enrich_book(self, book_id: str, title: str, author: str) -> bool:
+        """Enrich a single book with metadata from configured sources.
+
+        Args:
+            book_id: Database ID of the book
+            title: Book title
+            author: Author name
+
+        Returns:
+            True if enrichment was successful from at least one source, False otherwise
+
+        Raises:
+            APIError: If API request fails catastrophically
+        """
+        success = False
+
+        # Try Open Library first (if enabled)
+        if "openlibrary" in self.sources and self.openlibrary_client:
+            try:
+                success = self._enrich_book_openlibrary(book_id, title, author) or success
+            except APIError as e:
+                logger.error(f"✗ Open Library API error for '{title}': {e}")
+
+        # Then try Wikidata (if enabled)
+        if "wikidata" in self.sources and self.wikidata_client:
+            try:
+                success = self._enrich_book_wikidata(book_id, title, author) or success
+            except APIError as e:
+                logger.error(f"✗ Wikidata API error for '{title}': {e}")
+
+        return success
+
+    def _enrich_book_openlibrary(self, book_id: str, title: str, author: str) -> bool:
         """Enrich a single book with metadata from Open Library.
 
         Args:
@@ -140,23 +183,20 @@ class EnrichmentOrchestrator:
 
         Returns:
             True if enrichment was successful, False otherwise
-
-        Raises:
-            APIError: If API request fails catastrophically
         """
         try:
             # Search Open Library
             api_response = self.openlibrary_client.search_book(title, author)
 
             if not api_response:
-                logger.warning(f"✗ No match found for '{title}' by {author}")
+                logger.debug(f"✗ No Open Library match for '{title}' by {author}")
                 return False
 
             # Normalize API response
             normalized_data = self.book_normalizer.normalize(api_response, "openlibrary")
 
             # Update book record
-            self._update_book_fields(book_id, normalized_data)
+            self._update_book_fields(book_id, normalized_data, source="openlibrary")
 
             # Handle subjects (many-to-many relationship)
             subjects = normalized_data.get("subjects", [])
@@ -164,7 +204,7 @@ class EnrichmentOrchestrator:
                 self._add_book_subjects(book_id, subjects, source="openlibrary")
 
             logger.info(
-                f"✓ Enriched '{title}': "
+                f"✓ Open Library: "
                 f"ISBN-13: {normalized_data.get('isbn_13', 'N/A')}, "
                 f"Year: {normalized_data.get('publication_year', 'N/A')}, "
                 f"Subjects: {len(subjects)}"
@@ -173,30 +213,95 @@ class EnrichmentOrchestrator:
             return True
 
         except NoMatchError:
-            logger.warning(f"✗ No match for '{title}' by {author}")
-            return False
-
-        except APIError as e:
-            logger.error(f"✗ API error for '{title}': {e}")
+            logger.debug(f"✗ No Open Library match for '{title}' by {author}")
             return False
 
         except Exception as e:
-            logger.error(f"✗ Unexpected error for '{title}': {e}")
-            # Rollback transaction if database error occurred
-            try:
-                self.adapter.rollback()
-            except Exception:
-                pass  # Ignore rollback errors
+            logger.error(f"✗ Open Library error for '{title}': {e}")
             return False
 
-    def _update_book_fields(self, book_id: str, normalized_data: dict[str, Any]) -> None:
+    def _enrich_book_wikidata(self, book_id: str, title: str, author: str) -> bool:
+        """Enrich a single book with metadata from Wikidata.
+
+        Args:
+            book_id: Database ID of the book
+            title: Book title
+            author: Author name
+
+        Returns:
+            True if enrichment was successful, False otherwise
+        """
+        try:
+            # First try to find by ISBN if we have one
+            book_data = self.adapter.fetchone(
+                "SELECT isbn_13, isbn_10 FROM books WHERE id = ?", (book_id,)
+            )
+            isbn = book_data.get("isbn_13") or book_data.get("isbn_10") if book_data else None
+
+            api_response = None
+            if isbn:
+                api_response = self.wikidata_client.search_book_by_isbn(isbn)
+
+            # Fall back to title/author search if ISBN search failed
+            if not api_response:
+                api_response = self.wikidata_client.search_book_by_title_author(title, author)
+
+            if not api_response:
+                logger.debug(f"✗ No Wikidata match for '{title}' by {author}")
+                return False
+
+            # Normalize API response
+            normalized_data = self.wikidata_book_normalizer.normalize(api_response, "wikidata")
+
+            # Update book record
+            self._update_book_fields(book_id, normalized_data, source="wikidata")
+
+            # Handle subjects
+            subjects = normalized_data.get("subjects", [])
+            if subjects:
+                self._add_book_subjects(book_id, subjects, source="wikidata")
+
+            # Handle literary movements
+            movements = normalized_data.get("literary_movements", [])
+            if movements:
+                logger.debug(
+                    f"Found {len(movements)} literary movements (Phase 2.2 implementation pending)"
+                )
+
+            logger.info(
+                f"✓ Wikidata: "
+                f"ID: {normalized_data.get('wikidata_id', 'N/A')}, "
+                f"Subjects: {len(subjects)}, "
+                f"Movements: {len(movements)}"
+            )
+
+            return True
+
+        except NoMatchError:
+            logger.debug(f"✗ No Wikidata match for '{title}' by {author}")
+            return False
+
+        except Exception as e:
+            logger.error(f"✗ Wikidata error for '{title}': {e}")
+            return False
+
+    def _update_book_fields(
+        self, book_id: str, normalized_data: dict[str, Any], source: str
+    ) -> None:
         """Update book fields in database and log enrichment.
 
         Args:
             book_id: Book ID
             normalized_data: Normalized book metadata
+            source: Data source ('openlibrary', 'wikidata', etc.)
         """
         # Fields to update (excluding subjects which are handled separately)
+        # Map source to specific ID field
+        source_id_fields = {
+            "openlibrary": "openlibrary_id",
+            "wikidata": "wikidata_id",
+        }
+
         fields = [
             "isbn",
             "isbn_10",
@@ -207,8 +312,11 @@ class EnrichmentOrchestrator:
             "language",
             "description",
             "cover_url",
-            "openlibrary_id",
         ]
+
+        # Add source-specific ID field
+        if source in source_id_fields:
+            fields.append(source_id_fields[source])
 
         # Build UPDATE query dynamically for non-null fields
         updates = []
@@ -219,15 +327,21 @@ class EnrichmentOrchestrator:
                 updates.append(f"{field} = ?")
                 params.append(value)
 
+                # Determine API endpoint based on source
+                api_endpoint = {
+                    "openlibrary": OpenLibraryClient.SEARCH_URL,
+                    "wikidata": WikidataClient.SPARQL_ENDPOINT,
+                }.get(source, "unknown")
+
                 # Log enrichment
                 self.source_tracker.log_enrichment(
                     entity_type="book",
                     entity_id=book_id,
                     field_name=field,
                     new_value=value,
-                    source="openlibrary",
+                    source=source,
                     method="api",
-                    api_endpoint=OpenLibraryClient.SEARCH_URL,
+                    api_endpoint=api_endpoint,
                 )
 
         if not updates:
@@ -370,7 +484,10 @@ class EnrichmentOrchestrator:
 
     def close(self) -> None:
         """Clean up resources."""
-        self.openlibrary_client.close()
+        if self.openlibrary_client:
+            self.openlibrary_client.close()
+        if self.wikidata_client:
+            self.wikidata_client.close()
 
     def __enter__(self):
         """Context manager entry."""

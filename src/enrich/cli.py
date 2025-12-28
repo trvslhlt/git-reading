@@ -14,10 +14,10 @@ logger = get_logger(__name__)
 
 def cmd_enrich(args):
     """Run automatic enrichment from APIs."""
-    logger.info("Starting enrichment...")
+    logger.info(f"Starting enrichment from sources: {', '.join(args.sources)}")
 
     with get_adapter() as adapter:
-        orchestrator = EnrichmentOrchestrator(adapter)
+        orchestrator = EnrichmentOrchestrator(adapter, sources=args.sources)
 
         if args.entity_type in ("books", "both"):
             stats = orchestrator.enrich_books(limit=args.limit)

@@ -148,6 +148,13 @@ cython_debug/
 *.swo
 *~
 
+# Backup files (ruff, editors, etc.)
+*\ 2.md
+*\ 2.py
+*\ 2.*
+*.bak
+*.backup
+
 # OS
 .DS_Store
 Thumbs.db
