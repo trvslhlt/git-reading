@@ -8,6 +8,7 @@ from common.logger import get_logger
 
 from .base import APIClient, APIError, RateLimitError
 from .rate_limiter import RateLimiter
+from .wikidata_label_resolver import WikidataLabelResolver
 
 logger = get_logger(__name__)
 
@@ -40,6 +41,7 @@ class WikidataClient(APIClient):
             requests_per_period=requests_per_minute,
             period_seconds=60,
         )
+        self.label_resolver = WikidataLabelResolver()
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -394,8 +396,9 @@ class WikidataClient(APIClient):
         return (self.rate_limiter.requests_per_period, self.rate_limiter.period_seconds)
 
     def close(self) -> None:
-        """Close the HTTP session."""
+        """Close the HTTP session and label resolver."""
         self.session.close()
+        self.label_resolver.close()
 
     def __enter__(self):
         """Context manager entry."""

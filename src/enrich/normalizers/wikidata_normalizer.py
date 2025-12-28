@@ -1,8 +1,11 @@
 """Wikidata entity normalizer for author and book enrichment."""
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .base import Normalizer
+
+if TYPE_CHECKING:
+    from enrich.clients.wikidata_label_resolver import WikidataLabelResolver
 
 
 class WikidataBookNormalizer(Normalizer):
@@ -191,6 +194,53 @@ class WikidataBookNormalizer(Normalizer):
 
         return labels
 
+    @staticmethod
+    def resolve_qids(
+        normalized_data: dict[str, Any], label_resolver: "WikidataLabelResolver"
+    ) -> dict[str, Any]:
+        """Resolve Q-IDs to human-readable labels in normalized data.
+
+        Args:
+            normalized_data: Normalized book data (output of normalize())
+            label_resolver: WikidataLabelResolver instance
+
+        Returns:
+            Updated normalized data with labels instead of Q-IDs
+
+        Example:
+            >>> data = {"subjects": ["Q24925", "Q8261"]}
+            >>> WikidataBookNormalizer.resolve_qids(data, resolver)
+            {"subjects": ["Science fiction", "Novel"]}
+        """
+        # Collect all Q-IDs that need resolution
+        qids_to_resolve = []
+
+        # Subjects
+        subjects = normalized_data.get("subjects", [])
+        qids_to_resolve.extend([s for s in subjects if s.startswith("Q")])
+
+        # Literary movements
+        movements = normalized_data.get("literary_movements", [])
+        qids_to_resolve.extend([m for m in movements if m.startswith("Q")])
+
+        # Batch resolve all Q-IDs
+        if qids_to_resolve:
+            labels = label_resolver.resolve_batch(qids_to_resolve)
+
+            # Replace Q-IDs with labels in subjects (preserve non-Q-ID strings)
+            if subjects:
+                normalized_data["subjects"] = [
+                    labels.get(item, item) if item.startswith("Q") else item for item in subjects
+                ]
+
+            # Replace Q-IDs with labels in literary movements (preserve non-Q-ID strings)
+            if movements:
+                normalized_data["literary_movements"] = [
+                    labels.get(item, item) if item.startswith("Q") else item for item in movements
+                ]
+
+        return normalized_data
+
 
 class WikidataAuthorNormalizer(Normalizer):
     """Normalize Wikidata author entity data to database schema format."""
@@ -333,3 +383,65 @@ class WikidataAuthorNormalizer(Normalizer):
                 labels.append(entity_id)
 
         return labels
+
+    @staticmethod
+    def resolve_qids(
+        normalized_data: dict[str, Any], label_resolver: "WikidataLabelResolver"
+    ) -> dict[str, Any]:
+        """Resolve Q-IDs to human-readable labels in normalized author data.
+
+        Args:
+            normalized_data: Normalized author data (output of normalize())
+            label_resolver: WikidataLabelResolver instance
+
+        Returns:
+            Updated normalized data with labels instead of Q-IDs
+
+        Example:
+            >>> data = {"birth_place": "Q84", "nationality": "Q145"}
+            >>> WikidataAuthorNormalizer.resolve_qids(data, resolver)
+            {"birth_place": "London", "nationality": "United Kingdom"}
+        """
+        # Collect all Q-IDs that need resolution
+        qids_to_resolve = []
+
+        # Birth place
+        birth_place = normalized_data.get("birth_place")
+        if birth_place and birth_place.startswith("Q"):
+            qids_to_resolve.append(birth_place)
+
+        # Death place
+        death_place = normalized_data.get("death_place")
+        if death_place and death_place.startswith("Q"):
+            qids_to_resolve.append(death_place)
+
+        # Nationality
+        nationality = normalized_data.get("nationality")
+        if nationality and nationality.startswith("Q"):
+            qids_to_resolve.append(nationality)
+
+        # Literary movements
+        movements = normalized_data.get("literary_movements", [])
+        qids_to_resolve.extend([m for m in movements if m.startswith("Q")])
+
+        # Batch resolve all Q-IDs
+        if qids_to_resolve:
+            labels = label_resolver.resolve_batch(qids_to_resolve)
+
+            # Replace Q-IDs with labels for place fields
+            if birth_place and birth_place.startswith("Q"):
+                normalized_data["birth_place"] = labels.get(birth_place, birth_place)
+
+            if death_place and death_place.startswith("Q"):
+                normalized_data["death_place"] = labels.get(death_place, death_place)
+
+            if nationality and nationality.startswith("Q"):
+                normalized_data["nationality"] = labels.get(nationality, nationality)
+
+            # Replace Q-IDs with labels in literary movements (preserve non-Q-ID strings)
+            if movements:
+                normalized_data["literary_movements"] = [
+                    labels.get(item, item) if item.startswith("Q") else item for item in movements
+                ]
+
+        return normalized_data

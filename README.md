@@ -70,6 +70,30 @@ Git-reading supports two database backends:
 
 Set `DATABASE_TYPE=sqlite` in `.env` to use SQLite instead. See [docs/DATABASE.md](docs/DATABASE.md) for details.
 
+### Metadata Enrichment
+
+Automatically enrich your books and authors with metadata from external APIs:
+
+```bash
+# Check what's already enriched
+make run-enrich-status
+
+# Enrich books with ISBNs, publication info, subjects (Open Library)
+make run-enrich ARGS='--sources openlibrary --limit 10'
+
+# Enrich authors with biographical data, movements (Wikidata)
+make run-enrich ARGS='--sources wikidata --entity-type authors --limit 5'
+
+# Enrich everything from multiple sources
+make run-enrich ARGS='--sources openlibrary wikidata --entity-type both'
+```
+
+**What gets enriched:**
+- **Books**: ISBNs, publication year, subjects, literary movements, awards
+- **Authors**: Birth/death dates & places, nationality, biography, movements
+
+See [docs/ENRICHMENT_GUIDE.md](docs/ENRICHMENT_GUIDE.md) for complete reference.
+
 ### Visualization
 
 Interactive dashboard for exploring your indexed books:

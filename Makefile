@@ -49,7 +49,7 @@ help:
 	@echo "  make run-search-stats    - Show search index statistics (requires: make search-install)"
 	@echo ""
 	@echo "Enrichment Commands:"
-	@echo "  make run-enrich          - Enrich books with metadata from Open Library"
+	@echo "  make run-enrich          - Enrich books/authors with metadata from APIs"
 	@echo "  make run-enrich-status   - Show enrichment coverage statistics"
 	@echo "  make run-enrich-export   - Export enriched data to CSV/JSON"
 	@echo ""
@@ -70,10 +70,11 @@ help:
 	@echo "  make search              # Or use this to auto-install and build"
 	@echo "  make run-search-query ARGS='\"meaning of life\"'"
 	@echo ""
-	@echo "  # Enrich book metadata"
-	@echo "  make run-enrich-status   # Check current enrichment coverage"
-	@echo "  make run-enrich          # Enrich all unenriched books"
-	@echo "  make run-enrich ARGS='--limit 10'  # Test on 10 books first"
+	@echo "  # Enrich book and author metadata"
+	@echo "  make run-enrich-status                                    # Check coverage"
+	@echo "  make run-enrich ARGS='--sources openlibrary --limit 10'  # Test with 10 books"
+	@echo "  make run-enrich ARGS='--sources wikidata --entity-type authors'  # Enrich authors"
+	@echo "  make run-enrich ARGS='--sources wikidata --entity-type both'     # Enrich both"
 	@echo ""
 	@echo "  # Validate and fix notes"
 	@echo "  make run-validate ARGS='--notes-dir readings --format json --output issues.json'"
@@ -327,14 +328,28 @@ run-search-stats:
 # Data Enrichment
 #
 
-# Enrich books with metadata from Open Library
-# Fetches ISBNs, publication info, subjects from external APIs
-# Usage: make run-enrich                           # Enrich all unenriched books
-#        make run-enrich ARGS='--limit 10'         # Enrich first 10 books
-#        make run-enrich ARGS='--batch-size 20'    # Custom batch size
-#        make run-enrich ARGS='--help'             # Show all options
+# Enrich books and authors with metadata from external APIs
+# Sources: Open Library (books), Wikidata (books & authors)
+# Fetches ISBNs, publication info, subjects, author biographical data,
+# literary movements, awards, and more
+#
+# Usage:
+#   # Books only (Open Library)
+#   make run-enrich ARGS='--sources openlibrary --limit 10'
+#
+#   # Books and authors (Wikidata)
+#   make run-enrich ARGS='--sources wikidata --entity-type both --limit 5'
+#
+#   # Authors only (Wikidata)
+#   make run-enrich ARGS='--sources wikidata --entity-type authors'
+#
+#   # All unenriched books from both sources
+#   make run-enrich ARGS='--sources openlibrary wikidata'
+#
+#   # Show all options
+#   make run-enrich ARGS='--help'
 run-enrich:
-	@echo "Enriching book metadata from Open Library..."
+	@echo "Enriching metadata from external APIs..."
 	PYTHONPATH=src uv run python -m enrich.cli enrich $(ARGS)
 
 # Show enrichment coverage statistics

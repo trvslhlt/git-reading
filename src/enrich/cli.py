@@ -27,9 +27,13 @@ def cmd_enrich(args):
             logger.info(f"  Failed: {stats['failed']}")
             logger.info(f"  Skipped: {stats['skipped']}")
 
-        # TODO: Author enrichment in Phase 2
-        if args.entity_type == "authors":
-            logger.warning("Author enrichment not yet implemented (Phase 2)")
+        if args.entity_type in ("authors", "both"):
+            stats = orchestrator.enrich_authors(limit=args.limit)
+            logger.info("\nAuthor enrichment stats:")
+            logger.info(f"  Attempted: {stats['attempted']}")
+            logger.info(f"  Successful: {stats['successful']}")
+            logger.info(f"  Failed: {stats['failed']}")
+            logger.info(f"  Skipped: {stats['skipped']}")
 
         orchestrator.close()
 
@@ -137,15 +141,21 @@ def main():
         help="Run automatic enrichment from APIs",
         description=(
             "Enrich book and author metadata from external APIs.\\n\\n"
-            "Uses Open Library as the primary source for book metadata including\\n"
-            "ISBNs, publication info, subjects, and cover images.\\n\\n"
+            "Data Sources:\\n"
+            "  • Open Library - Book metadata (ISBNs, subjects, publication info)\\n"
+            "  • Wikidata - Books & authors (biographical data, movements, awards)\\n\\n"
+            "What gets enriched:\\n"
+            "  Books:  ISBNs, publication year, subjects, literary movements, awards\\n"
+            "  Authors: Birth/death dates & places, nationality, biography, movements\\n\\n"
             "Examples:\\n"
-            "  # Enrich all unenriched books\\n"
-            "  enrich-db enrich\\n\\n"
-            "  # Enrich first 10 books only\\n"
-            "  enrich-db enrich --limit 10\\n\\n"
-            "  # Enrich with custom batch size\\n"
-            "  enrich-db enrich --batch-size 20\\n"
+            "  # Enrich books from Open Library\\n"
+            "  enrich-db enrich --sources openlibrary --limit 10\\n\\n"
+            "  # Enrich authors from Wikidata\\n"
+            "  enrich-db enrich --sources wikidata --entity-type authors\\n\\n"
+            "  # Enrich both books and authors from Wikidata\\n"
+            "  enrich-db enrich --sources wikidata --entity-type both --limit 5\\n\\n"
+            "  # Use multiple sources\\n"
+            "  enrich-db enrich --sources openlibrary wikidata\\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

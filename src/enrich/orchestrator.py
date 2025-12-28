@@ -173,6 +173,163 @@ class EnrichmentOrchestrator:
 
         return success
 
+    def enrich_authors(self, limit: int | None = None) -> dict[str, int]:
+        """Enrich all unenriched authors in the database.
+
+        Args:
+            limit: Maximum number of authors to enrich (None = all)
+
+        Returns:
+            Dictionary with statistics:
+                - attempted: Number of authors attempted
+                - successful: Number successfully enriched
+                - failed: Number that failed
+                - skipped: Number skipped (already enriched)
+
+        Note:
+            Each author is committed individually to prevent transaction errors
+            from affecting subsequent authors.
+
+        Example:
+            >>> orchestrator = EnrichmentOrchestrator(sources=['wikidata'])
+            >>> stats = orchestrator.enrich_authors(limit=10)
+            >>> print(f"Enriched {stats['successful']}/{stats['attempted']} authors")
+        """
+        stats = {"attempted": 0, "successful": 0, "failed": 0, "skipped": 0}
+
+        # Get unenriched authors (where wikidata_id is NULL)
+        query = "SELECT id, name FROM authors WHERE wikidata_id IS NULL"
+        if limit:
+            query += f" LIMIT {limit}"
+
+        authors = self.adapter.fetchall(query)
+
+        if not authors:
+            logger.info("No unenriched authors found")
+            return stats
+
+        logger.info(f"Found {len(authors)} author(s) to enrich")
+
+        for i, author in enumerate(authors):
+            author_id = author["id"]
+            name = author["name"]
+
+            try:
+                logger.info(f"[{i + 1}/{len(authors)}] Enriching author '{name}'")
+
+                success = self.enrich_author(author_id, name)
+                stats["attempted"] += 1
+                if success:
+                    stats["successful"] += 1
+                    # Commit immediately after successful enrichment
+                    self.adapter.commit()
+                else:
+                    stats["failed"] += 1
+                    # Ensure transaction is clean after failure
+                    try:
+                        self.adapter.rollback()
+                    except Exception:
+                        pass
+
+            except Exception as e:
+                logger.error(f"Unexpected error enriching '{name}': {e}")
+                stats["attempted"] += 1
+                stats["failed"] += 1
+                # Rollback the failed transaction before continuing
+                try:
+                    self.adapter.rollback()
+                except Exception:
+                    pass
+                continue
+
+        logger.info(
+            f"\n[green]✓[/green] Author enrichment complete!\n"
+            f"  Attempted: {stats['attempted']}\n"
+            f"  Successful: {stats['successful']}\n"
+            f"  Failed: {stats['failed']}\n"
+            f"  Skipped: {stats['skipped']}"
+        )
+
+        return stats
+
+    def enrich_author(self, author_id: str, name: str) -> bool:
+        """Enrich a single author with metadata from configured sources.
+
+        Args:
+            author_id: Database ID of the author
+            name: Author name
+
+        Returns:
+            True if enrichment was successful from at least one source, False otherwise
+
+        Raises:
+            APIError: If API request fails catastrophically
+        """
+        success = False
+
+        # Currently only Wikidata has author data
+        if "wikidata" in self.sources and self.wikidata_client:
+            try:
+                success = self._enrich_author_wikidata(author_id, name) or success
+            except APIError as e:
+                logger.error(f"✗ Wikidata API error for author '{name}': {e}")
+
+        return success
+
+    def _enrich_author_wikidata(self, author_id: str, name: str) -> bool:
+        """Enrich a single author with metadata from Wikidata.
+
+        Args:
+            author_id: Database ID of the author
+            name: Author name
+
+        Returns:
+            True if enrichment was successful, False otherwise
+        """
+        try:
+            # Search Wikidata for author
+            api_response = self.wikidata_client.search_author(name)
+
+            if not api_response:
+                logger.debug(f"✗ No Wikidata match for author '{name}'")
+                return False
+
+            # Normalize API response
+            normalized_data = self.wikidata_author_normalizer.normalize(api_response, "wikidata")
+
+            # Resolve Q-IDs to human-readable labels
+            from .normalizers.wikidata_normalizer import WikidataAuthorNormalizer
+
+            normalized_data = WikidataAuthorNormalizer.resolve_qids(
+                normalized_data, self.wikidata_client.label_resolver
+            )
+
+            # Update author record
+            self._update_author_fields(author_id, normalized_data, source="wikidata")
+
+            # Handle literary movements
+            movements = normalized_data.get("literary_movements", [])
+            if movements:
+                self._add_author_movements(author_id, movements, source="wikidata")
+
+            logger.info(
+                f"✓ Wikidata: "
+                f"ID: {normalized_data.get('wikidata_id', 'N/A')}, "
+                f"Birth: {normalized_data.get('birth_year', 'N/A')}, "
+                f"Death: {normalized_data.get('death_year', 'N/A')}, "
+                f"Movements: {len(movements)}"
+            )
+
+            return True
+
+        except NoMatchError:
+            logger.debug(f"✗ No Wikidata match for author '{name}'")
+            return False
+
+        except Exception as e:
+            logger.error(f"✗ Wikidata error for author '{name}': {e}")
+            return False
+
     def _enrich_book_openlibrary(self, book_id: str, title: str, author: str) -> bool:
         """Enrich a single book with metadata from Open Library.
 
@@ -253,6 +410,13 @@ class EnrichmentOrchestrator:
             # Normalize API response
             normalized_data = self.wikidata_book_normalizer.normalize(api_response, "wikidata")
 
+            # Resolve Q-IDs to human-readable labels
+            from .normalizers.wikidata_normalizer import WikidataBookNormalizer
+
+            normalized_data = WikidataBookNormalizer.resolve_qids(
+                normalized_data, self.wikidata_client.label_resolver
+            )
+
             # Update book record
             self._update_book_fields(book_id, normalized_data, source="wikidata")
 
@@ -264,15 +428,19 @@ class EnrichmentOrchestrator:
             # Handle literary movements
             movements = normalized_data.get("literary_movements", [])
             if movements:
-                logger.debug(
-                    f"Found {len(movements)} literary movements (Phase 2.2 implementation pending)"
-                )
+                self._add_book_movements(book_id, movements, source="wikidata")
+
+            # Handle awards
+            awards = normalized_data.get("awards", [])
+            if awards:
+                self._add_book_awards(book_id, awards, source="wikidata")
 
             logger.info(
                 f"✓ Wikidata: "
                 f"ID: {normalized_data.get('wikidata_id', 'N/A')}, "
                 f"Subjects: {len(subjects)}, "
-                f"Movements: {len(movements)}"
+                f"Movements: {len(movements)}, "
+                f"Awards: {len(awards)}"
             )
 
             return True
@@ -356,6 +524,66 @@ class EnrichmentOrchestrator:
 
         self.adapter.execute(query, tuple(params))
 
+    def _update_author_fields(
+        self, author_id: str, normalized_data: dict[str, Any], source: str
+    ) -> None:
+        """Update author fields in database and log enrichment.
+
+        Args:
+            author_id: Author ID
+            normalized_data: Normalized author metadata
+            source: Data source ('wikidata', etc.)
+        """
+        # Fields to update
+        fields = [
+            "wikidata_id",
+            "birth_year",
+            "death_year",
+            "birth_place",
+            "death_place",
+            "nationality",
+            "bio",
+            "wikipedia_url",
+            "viaf_id",
+        ]
+
+        # Build UPDATE query dynamically for non-null fields
+        updates = []
+        params = []
+        for field in fields:
+            value = normalized_data.get(field)
+            if value is not None:
+                updates.append(f"{field} = ?")
+                params.append(value)
+
+                # Determine API endpoint based on source
+                api_endpoint = {
+                    "wikidata": WikidataClient.SPARQL_ENDPOINT,
+                }.get(source, "unknown")
+
+                # Log enrichment
+                self.source_tracker.log_enrichment(
+                    entity_type="author",
+                    entity_id=author_id,
+                    field_name=field,
+                    new_value=value,
+                    source=source,
+                    method="api",
+                    api_endpoint=api_endpoint,
+                )
+
+        if not updates:
+            return
+
+        # Add updated_at timestamp
+        updates.append("updated_at = CURRENT_TIMESTAMP")
+
+        # Execute update
+        params.append(author_id)
+        query = f"UPDATE authors SET {', '.join(updates)} WHERE id = ?"
+
+        self.adapter.execute(query, tuple(params))
+
     def _add_book_subjects(self, book_id: str, subjects: list[str], source: str) -> None:
         """Add subjects to book with source tracking.
 
@@ -428,6 +656,180 @@ class EnrichmentOrchestrator:
         normalized = subject_name.lower().strip()
         hash_digest = hashlib.sha256(normalized.encode()).hexdigest()
         return f"subject:{hash_digest[:16]}"
+
+    def _add_book_movements(self, book_id: str, movements: list[str], source: str) -> None:
+        """Add literary movements to book with source tracking.
+
+        Args:
+            book_id: Book ID
+            movements: List of movement names
+            source: Source identifier ('wikidata', etc.)
+        """
+        for movement_name in movements:
+            if not movement_name.strip():
+                continue
+
+            # Get or create movement
+            movement_id = self._get_or_create_movement(movement_name)
+
+            # Link book to movement with source tracking
+            try:
+                self.adapter.execute(
+                    """
+                    INSERT INTO book_movements (book_id, movement_id, source)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(book_id, movement_id) DO UPDATE SET
+                        source = excluded.source
+                    """,
+                    (book_id, movement_id, source),
+                )
+            except IntegrityError:
+                # Already exists, that's fine
+                pass
+
+    def _add_author_movements(self, author_id: str, movements: list[str], source: str) -> None:
+        """Add literary movements to author with source tracking.
+
+        Args:
+            author_id: Author ID
+            movements: List of movement names
+            source: Source identifier ('wikidata', etc.)
+        """
+        for movement_name in movements:
+            if not movement_name.strip():
+                continue
+
+            # Get or create movement
+            movement_id = self._get_or_create_movement(movement_name)
+
+            # Link author to movement with source tracking
+            try:
+                self.adapter.execute(
+                    """
+                    INSERT INTO author_movements (author_id, movement_id, source)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(author_id, movement_id) DO UPDATE SET
+                        source = excluded.source
+                    """,
+                    (author_id, movement_id, source),
+                )
+            except IntegrityError:
+                # Already exists, that's fine
+                pass
+
+    def _add_book_awards(self, book_id: str, awards: list[str], source: str) -> None:
+        """Add awards to book with source tracking.
+
+        Args:
+            book_id: Book ID
+            awards: List of award names
+            source: Source identifier ('wikidata', etc.)
+        """
+        for award_name in awards:
+            if not award_name.strip():
+                continue
+
+            # Get or create award
+            award_id = self._get_or_create_award(award_name)
+
+            # Link book to award with source tracking
+            try:
+                self.adapter.execute(
+                    """
+                    INSERT INTO book_awards (book_id, award_id, source)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(book_id, award_id) DO UPDATE SET
+                        source = excluded.source
+                    """,
+                    (book_id, award_id, source),
+                )
+            except IntegrityError:
+                # Already exists, that's fine
+                pass
+
+    def _get_or_create_award(self, award_name: str) -> str:
+        """Get existing award ID or create new award.
+
+        Args:
+            award_name: Award name
+
+        Returns:
+            Award ID
+        """
+        # Generate deterministic ID from name
+        award_id = self._generate_award_id(award_name)
+
+        # Try to insert (will fail if exists on either id or name)
+        try:
+            self.adapter.execute(
+                """
+                INSERT INTO awards (id, name)
+                VALUES (?, ?)
+                ON CONFLICT(id) DO NOTHING
+                """,
+                (award_id, award_name),
+            )
+        except IntegrityError:
+            # Award already exists (name conflict)
+            pass
+
+        return award_id
+
+    def _generate_award_id(self, award_name: str) -> str:
+        """Generate deterministic award ID from name.
+
+        Args:
+            award_name: Award name
+
+        Returns:
+            Award ID (hash-based)
+        """
+        # Use SHA256 hash of normalized name
+        normalized = award_name.lower().strip()
+        hash_digest = hashlib.sha256(normalized.encode()).hexdigest()
+        return f"award:{hash_digest[:16]}"
+
+    def _get_or_create_movement(self, movement_name: str) -> str:
+        """Get existing movement ID or create new movement.
+
+        Args:
+            movement_name: Movement name
+
+        Returns:
+            Movement ID
+        """
+        # Generate deterministic ID from name
+        movement_id = self._generate_movement_id(movement_name)
+
+        # Try to insert (will fail if exists on either id or name)
+        try:
+            self.adapter.execute(
+                """
+                INSERT INTO literary_movements (id, name)
+                VALUES (?, ?)
+                ON CONFLICT(id) DO NOTHING
+                """,
+                (movement_id, movement_name),
+            )
+        except IntegrityError:
+            # Movement already exists (name conflict)
+            pass
+
+        return movement_id
+
+    def _generate_movement_id(self, movement_name: str) -> str:
+        """Generate deterministic movement ID from name.
+
+        Args:
+            movement_name: Movement name
+
+        Returns:
+            Movement ID (hash-based)
+        """
+        # Use SHA256 hash of normalized name
+        normalized = movement_name.lower().strip()
+        hash_digest = hashlib.sha256(normalized.encode()).hexdigest()
+        return f"movement:{hash_digest[:16]}"
 
     def get_enrichment_coverage(self) -> dict[str, Any]:
         """Get statistics about enrichment coverage.

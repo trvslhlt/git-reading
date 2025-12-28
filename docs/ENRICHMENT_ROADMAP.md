@@ -34,52 +34,64 @@ This document outlines the phased approach to enriching book metadata in the git
 
 **Goal**: Link books across multiple knowledge bases for richer metadata
 
-### 2.1 Wikidata Integration ✅ BASIC IMPLEMENTATION COMPLETE
+### 2.1 Wikidata Integration ✅ COMPLETED
 
 **Why**: Wikidata provides structured data about books, authors, literary movements, and influences
 
-**Data to Fetch**:
-- ✅ Author biographical data (birth/death dates, nationality)
-- ✅ Literary movements and genres (Q-IDs captured, label resolution pending)
-- ✅ Thematic tags and concepts
+**Data Enriched**:
+- ✅ Author biographical data (birth/death dates & places, nationality, biography)
+- ✅ Literary movements (with Q-ID → label resolution)
+- ✅ Thematic tags and subjects (with Q-ID → label resolution)
 - ✅ Awards and recognition
+- ✅ Wikipedia URLs and VIAF IDs
 - ⏳ Translations and editions (schema ready, not yet implemented)
 - ⏳ Influence relationships (schema ready, not yet implemented)
 
-**Implementation Status**:
-1. ✅ Create Wikidata SPARQL API client
-2. ✅ ISBN/title+author → Wikidata entity lookup
-3. ✅ Fetch structured data about works and authors
-4. ✅ Store in database with source tracking (via `wikidata_id` fields)
-5. ✅ Create enrichment workflow integrated with existing CLI
+**Implementation Highlights**:
+1. ✅ Wikidata SPARQL API client with rate limiting
+2. ✅ Q-ID label resolution with batch API calls and caching
+3. ✅ Book and author enrichment workflows
+4. ✅ Literary movements and awards database storage
+5. ✅ Integrated CLI with `--entity-type` support
 
-**Files Created**:
+**Files Created/Updated**:
 - [src/enrich/clients/wikidata.py](../src/enrich/clients/wikidata.py) - SPARQL API client
-- [src/enrich/normalizers/wikidata_normalizer.py](../src/enrich/normalizers/wikidata_normalizer.py) - Data normalizers
+- [src/enrich/clients/wikidata_label_resolver.py](../src/enrich/clients/wikidata_label_resolver.py) - Q-ID to label resolution
+- [src/enrich/normalizers/wikidata_normalizer.py](../src/enrich/normalizers/wikidata_normalizer.py) - Data normalizers with Q-ID resolution
+- [src/enrich/orchestrator.py](../src/enrich/orchestrator.py) - Author enrichment workflow
 - [tests/enrich/test_wikidata_normalizer.py](../tests/enrich/test_wikidata_normalizer.py) - Unit tests
 
 **Usage**:
 ```bash
-# Enrich books from both Open Library and Wikidata
+# Enrich books from both sources
 enrich-db enrich --sources openlibrary wikidata --limit 10
 
-# Enrich only from Wikidata
-enrich-db enrich --sources wikidata --limit 10
+# Enrich authors only (Wikidata)
+enrich-db enrich --sources wikidata --entity-type authors --limit 5
+
+# Enrich both books and authors (Wikidata)
+enrich-db enrich --sources wikidata --entity-type both --limit 10
+
+# Via Makefile
+make run-enrich ARGS='--sources wikidata --entity-type both --limit 5'
 ```
 
-**Limitations & Future Work**:
-- Q-IDs are currently stored instead of labels (e.g., "Q84" instead of "London")
-- Need to implement Q-ID → label resolution for subjects, places, movements
-- Author influence graph not yet populated (method exists in client)
-- Literary movements captured but not stored in `literary_movements` table
-- ISBN search in Wikidata has low coverage (prefer title+author search)
+**Key Features**:
+- **Q-ID Resolution**: Automatic conversion of Wikidata Q-IDs to human-readable labels
+  - Example: "Q84" → "London", "Q24925" → "Science fiction"
+  - Batch resolution (up to 50 Q-IDs per API call)
+  - In-memory caching to minimize API requests
+- **Author Enrichment**: Birth/death dates, places, nationality, biography, movements
+- **Literary Movements**: Stored for both books and authors with source tracking
+- **Awards**: Book awards captured and stored in dedicated tables
 
 **Database Impact**:
-- ✅ Uses existing `wikidata_id` fields in `books` and `authors` tables
-- ✅ `book_subjects` with source='wikidata'
-- ⏳ `author_influences` table (exists but not populated)
-- ⏳ `literary_movements` table (exists but not populated)
-- ⏳ Awards table (data captured but not stored)
+- ✅ Uses `wikidata_id` fields in `books` and `authors` tables
+- ✅ `book_subjects` with source='wikidata' (with resolved labels)
+- ✅ `literary_movements` table populated
+- ✅ `book_movements` and `author_movements` tables populated
+- ✅ `awards` and `book_awards` tables populated
+- ⏳ `author_influences` table (exists but not yet populated)
 
 ### 2.2 WorldCat/Library of Congress
 
