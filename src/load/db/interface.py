@@ -53,10 +53,27 @@ class DatabaseAdapter(ABC):
     def create_schema(self) -> None:
         """Create all database tables and indexes.
 
+        This method creates the base schema. After calling this, run_migrations()
+        should be called to apply any pending schema updates.
+
         Raises:
             SchemaError: If schema creation fails
         """
         pass
+
+    def run_migrations(self) -> int:
+        """Run pending database migrations.
+
+        Returns:
+            Number of migrations applied
+
+        Raises:
+            DatabaseError: If migration fails
+        """
+        from .migrations import MigrationRunner
+
+        runner = MigrationRunner(self)
+        return runner.run_migrations()
 
     @abstractmethod
     def get_tables(self) -> list[str]:
@@ -212,6 +229,27 @@ class DatabaseAdapter(ABC):
 
         Raises:
             SchemaError: If schema drop fails
+        """
+        pass
+
+    @abstractmethod
+    def string_agg(self, column: str, separator: str = ",", distinct: bool = False) -> str:
+        """Generate database-specific string aggregation SQL.
+
+        Args:
+            column: Column name to aggregate
+            separator: Separator for concatenated strings (default: ',')
+            distinct: Whether to use DISTINCT (default: False)
+
+        Returns:
+            SQL string for aggregating strings
+            - PostgreSQL: string_agg(column, separator)
+            - SQLite: GROUP_CONCAT(column)
+
+        Example:
+            >>> adapter.string_agg('bs.source', ',', distinct=True)
+            'string_agg(DISTINCT bs.source, ',')'  # PostgreSQL
+            'GROUP_CONCAT(DISTINCT bs.source)'     # SQLite
         """
         pass
 

@@ -118,28 +118,54 @@ make run-enrich ARGS='--sources wikidata --entity-type both --limit 5'
 
 ---
 
-## Phase 3: Derived Data & Analytics (FUTURE)
+## Phase 3: Derived Data & Analytics (IN PROGRESS)
 
 **Goal**: Generate insights from enriched data
 
-### 3.1 Author Networks
+**Detailed Documentation**: See [PHASE_3_ANALYTICS.md](PHASE_3_ANALYTICS.md)
 
-- Build graph of author influences
-- Identify literary clusters
-- Temporal analysis of reading patterns
+### 3.1 Author Networks ✅ COMPLETED
 
-### 3.2 Thematic Analysis
+**Status**: Completed 2025-12-29
 
-- Topic modeling across notes
-- Theme extraction from book subjects
-- Reading pattern analysis
+- ✅ Built interactive Streamlit page for exploring influence relationships
+- ✅ Network overview with statistics (476 authors, 490 relationships)
+- ✅ Most influential/influenced author rankings
+- ✅ Filter by selected authors and their connections
+- ✅ Display biographical data and influence details
 
-### 3.3 Reading Statistics
+**Files Created**:
+- `streamlit_app/pages/4_🕸️_Author_Network.py`
 
-- Books per author/movement/subject
-- Reading velocity over time
-- Genre distribution
-- Temporal trends in interests
+**Future Enhancement**: Replace table view with interactive graph visualization (pyvis/networkx)
+
+### 3.2 Thematic Analysis ✅ COMPLETED
+
+**Status**: Completed 2025-12-29
+
+- ✅ Subject distribution with bar charts and filtering
+- ✅ Literary movement analysis with timelines
+- ✅ Subject co-occurrence analysis
+- ✅ Interactive book/author explorers by subject/movement
+- ✅ Source tracking (Open Library vs Wikidata)
+
+**Files Created**:
+- `streamlit_app/pages/5_📚_Thematic_Analysis.py`
+
+### 3.3 Reading Statistics ✅ COMPLETED
+
+**Status**: Completed 2025-12-29
+
+- ✅ Temporal reading patterns (year/quarter/month)
+- ✅ Reading velocity metrics
+- ✅ Author demographics (nationality, lifespan)
+- ✅ Publication era analysis (by century and decade)
+- ✅ Book age when read analysis
+- ✅ Books per author statistics
+- ✅ Awards analysis
+
+**Files Created**:
+- `streamlit_app/pages/6_📈_Reading_Stats.py`
 
 ---
 

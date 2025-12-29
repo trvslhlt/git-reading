@@ -212,7 +212,7 @@ def render_network_graph(network_data):
 
     if relationships:
         df = pd.DataFrame(relationships)
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, width="stretch")
     else:
         st.info("No relationships to display")
 
@@ -269,7 +269,7 @@ def main():
             )
 
         df = pd.DataFrame(influential_data)
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, width="stretch")
 
     # Most influenced authors
     if stats.get("most_influenced"):
@@ -286,7 +286,7 @@ def main():
             )
 
         df = pd.DataFrame(influenced_data)
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, width="stretch")
 
     # Filter controls
     st.header("Explore Network")

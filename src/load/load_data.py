@@ -99,6 +99,14 @@ def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = F
     with get_adapter() as adapter:
         adapter.create_schema()
 
+        # Run pending migrations
+        logger.info("Checking for schema migrations...")
+        migrations_applied = adapter.run_migrations()
+        if migrations_applied > 0:
+            logger.info(f"Applied {migrations_applied} migration(s)")
+        else:
+            logger.info("Schema is up to date")
+
     # Connect and load
     with get_adapter() as adapter:
         # Track unique books and authors
@@ -115,6 +123,7 @@ def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = F
             author = generate_author(author_first_name, author_last_name)
             section = item.section
             excerpt = item.content
+            date_read = item.date_read
 
             # Generate IDs
             author_id = generate_author_id(author)
@@ -143,13 +152,15 @@ def load_from_extractions(index_dir: Path, verbose: bool = True, force: bool = F
                 try:
                     adapter.execute(
                         """
-                        INSERT INTO books (id, title)
-                        VALUES (?, ?)
-                        ON CONFLICT(id) DO UPDATE SET title=EXCLUDED.title
+                        INSERT INTO books (id, title, date_read)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            title=EXCLUDED.title,
+                            date_read=COALESCE(EXCLUDED.date_read, books.date_read)
                     """,
-                        (book_id, title),
+                        (book_id, title, date_read),
                     )
-                    books_seen[book_id] = {"title": title, "author": author}
+                    books_seen[book_id] = {"title": title, "author": author, "date_read": date_read}
 
                     # Link book to author
                     adapter.execute(

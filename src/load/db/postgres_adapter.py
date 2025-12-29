@@ -301,6 +301,24 @@ class PostgreSQLAdapter(DatabaseAdapter):
         """
         return "%s"
 
+    def string_agg(self, column: str, separator: str = ",", distinct: bool = False) -> str:
+        """Generate PostgreSQL-specific string aggregation SQL.
+
+        Args:
+            column: Column name to aggregate
+            separator: Separator for concatenated strings (default: ',')
+            distinct: Whether to use DISTINCT (default: False)
+
+        Returns:
+            SQL string for aggregating strings using string_agg()
+
+        Example:
+            >>> adapter.string_agg('bs.source', ',', distinct=True)
+            "string_agg(DISTINCT bs.source, ',')"
+        """
+        distinct_keyword = "DISTINCT " if distinct else ""
+        return f"string_agg({distinct_keyword}{column}, '{separator}')"
+
     def __repr__(self) -> str:
         """String representation."""
         status = "connected" if self._conn else "disconnected"

@@ -205,6 +205,24 @@ class SQLiteAdapter(DatabaseAdapter):
             cursor.execute(f"DROP TABLE IF EXISTS {table}")
         self._conn.commit()
 
+    def string_agg(self, column: str, separator: str = ",", distinct: bool = False) -> str:
+        """Generate SQLite-specific string aggregation SQL.
+
+        Args:
+            column: Column name to aggregate
+            separator: Separator for concatenated strings (default: ',')
+            distinct: Whether to use DISTINCT (default: False)
+
+        Returns:
+            SQL string for aggregating strings using GROUP_CONCAT()
+
+        Example:
+            >>> adapter.string_agg('bs.source', ',', distinct=True)
+            'GROUP_CONCAT(DISTINCT bs.source)'
+        """
+        distinct_keyword = "DISTINCT " if distinct else ""
+        return f"GROUP_CONCAT({distinct_keyword}{column})"
+
     def __repr__(self) -> str:
         """String representation."""
         status = "connected" if self._conn else "disconnected"
