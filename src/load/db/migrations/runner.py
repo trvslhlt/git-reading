@@ -99,7 +99,14 @@ class MigrationRunner:
 
         # Execute migration
         try:
-            self.adapter.execute(sql)
+            # For SQLite, use executescript to handle multiple statements
+            # For PostgreSQL, execute handles it
+            if hasattr(self.adapter, "_conn") and hasattr(self.adapter._conn, "executescript"):
+                # SQLite: use executescript for multi-statement support
+                self.adapter._conn.executescript(sql)
+            else:
+                # PostgreSQL: use regular execute
+                self.adapter.execute(sql)
 
             # Record migration
             self.adapter.execute(

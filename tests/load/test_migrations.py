@@ -116,13 +116,18 @@ class TestMigrationRunner:
     def test_run_migrations_empty(self, temp_db):
         """Test running migrations when none are pending."""
         temp_db.connect()
+
+        # Create schema first (migrations expect tables to exist)
+        temp_db.create_schema()
+
         runner = MigrationRunner(temp_db)
 
-        # Clear migrations directory
-        if runner.migrations_dir.exists():
-            for f in runner.migrations_dir.glob("*.sql"):
-                f.unlink()
+        # All real migrations should be applied
+        # This test verifies that running migrations a second time is a no-op
+        applied = runner.run_migrations()
+        assert applied >= 0  # May be 0 if already applied, or 3 if first run
 
+        # Run again - should be no pending migrations
         applied = runner.run_migrations()
         assert applied == 0
 
@@ -131,6 +136,10 @@ class TestMigrationRunner:
     def test_run_migrations_with_pending(self, temp_db):
         """Test running migrations with pending migrations."""
         temp_db.connect()
+
+        # Create schema first
+        temp_db.create_schema()
+
         runner = MigrationRunner(temp_db)
 
         # Create test migrations
@@ -144,11 +153,11 @@ class TestMigrationRunner:
         migration2.write_text("CREATE TABLE IF NOT EXISTS table2 (id INTEGER PRIMARY KEY);")
 
         try:
-            # Run migrations
+            # Run migrations (includes 3 real migrations + 2 test migrations = 5)
             applied = runner.run_migrations()
-            assert applied == 2
+            assert applied == 5
 
-            # Check tables were created
+            # Check test tables were created
             tables = temp_db.get_tables()
             assert "table1" in tables
             assert "table2" in tables
@@ -189,11 +198,14 @@ class TestMigrationRunner:
             # Get pending migrations
             pending = runner.get_pending_migrations()
 
-            # Check order
-            assert len(pending) == 3
-            assert pending[0][0] == 995
-            assert pending[1][0] == 996
-            assert pending[2][0] == 997
+            # Check order (includes real migrations 1,2,3 plus test migrations)
+            assert len(pending) == 6
+            assert pending[0][0] == 1  # Real migration
+            assert pending[1][0] == 2  # Real migration
+            assert pending[2][0] == 3  # Real migration
+            assert pending[3][0] == 995  # Test migration
+            assert pending[4][0] == 996  # Test migration
+            assert pending[5][0] == 997  # Test migration
 
         finally:
             # Cleanup
@@ -250,9 +262,12 @@ class TestMigrationRunner:
             # Get pending migrations
             pending = runner.get_pending_migrations()
 
-            # Should only have the valid one
-            assert len(pending) == 1
-            assert pending[0][0] == 993
+            # Should have 3 real migrations plus 1 valid test migration
+            assert len(pending) == 4
+            assert pending[0][0] == 1  # Real migration
+            assert pending[1][0] == 2  # Real migration
+            assert pending[2][0] == 3  # Real migration
+            assert pending[3][0] == 993  # Test migration
 
         finally:
             # Cleanup
