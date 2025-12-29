@@ -87,7 +87,7 @@ class TestAuthorInfluences:
             }
         ]
 
-        count = orchestrator._add_author_influences("author-123", influences)
+        count = orchestrator._add_author_influences("author-123", influences, "Q42")
 
         # Verify the influence was added
         assert count == 1
@@ -121,7 +121,7 @@ class TestAuthorInfluences:
             }
         ]
 
-        count = orchestrator._add_author_influences("author-123", influences)
+        count = orchestrator._add_author_influences("author-123", influences, "Q42")
 
         # Verify the influence was added
         assert count == 1
@@ -160,14 +160,14 @@ class TestAuthorInfluences:
             },
         ]
 
-        count = orchestrator._add_author_influences("author-123", influences)
+        count = orchestrator._add_author_influences("author-123", influences, "Q42")
 
         # Verify both influences were added
         assert count == 2
 
     def test_add_author_influences_empty_list(self, orchestrator, mock_adapter):
         """Test handling empty influence list."""
-        count = orchestrator._add_author_influences("author-123", [])
+        count = orchestrator._add_author_influences("author-123", [], "Q42")
 
         # Should return 0
         assert count == 0
@@ -191,7 +191,7 @@ class TestAuthorInfluences:
             }
         ]
 
-        count = orchestrator._add_author_influences("author-123", influences)
+        count = orchestrator._add_author_influences("author-123", influences, "Q42")
 
         # Should skip the incomplete influence
         assert count == 0
