@@ -254,8 +254,12 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 cursor.execute(pg_query)
             return cursor
         except psycopg.errors.IntegrityError as e:
+            # Rollback transaction to prevent "aborted transaction" state
+            self._conn.rollback()
             raise DBIntegrityError(f"Integrity constraint violation: {e}") from e
         except psycopg.Error as e:
+            # Rollback transaction to prevent "aborted transaction" state
+            self._conn.rollback()
             raise DatabaseError(f"Query execution failed: {e}") from e
 
     def fetchone(self, query: str, params: tuple | None = None) -> Row | None:

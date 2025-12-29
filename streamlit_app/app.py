@@ -8,10 +8,18 @@ This is a multi-page app with:
 Run with: streamlit run streamlit_app/app.py
 """
 
+import sys
+from pathlib import Path
+
 import streamlit as st
 
-from common.constants import INDEX_DIR, VECTOR_STORE_DIR
-from common.env import env
+# Add src to path for imports
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+from common.constants import INDEX_DIR, VECTOR_STORE_DIR  # noqa: E402
+from common.env import env  # noqa: E402
 
 # Page configuration
 st.set_page_config(
@@ -48,6 +56,7 @@ with st.sidebar:
     st.page_link("pages/1_📊_Analytics_Overview.py", label="Analytics Overview", icon="📊")
     st.page_link("pages/2_🔍_Semantic_Search.py", label="Semantic Search", icon="🔍")
     st.page_link("pages/3_🗄️_Database_Explorer.py", label="Database Explorer", icon="🗄️")
+    st.page_link("pages/4_🕸️_Author_Network.py", label="Author Network", icon="🕸️")
 
     st.markdown("---")
 
@@ -77,7 +86,7 @@ Choose a page from the sidebar to get started:
 )
 
 # Page descriptions
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.subheader("📊 Analytics Overview")
@@ -92,7 +101,7 @@ View comprehensive statistics about your reading:
 Perfect for understanding your reading patterns.
 """
     )
-    if st.button("Go to Analytics →", width="stretch"):
+    if st.button("Go to Analytics →", key="analytics_button", use_container_width=True):
         st.switch_page("pages/1_📊_Analytics_Overview.py")
 
 with col2:
@@ -108,7 +117,7 @@ Find passages using AI-powered search:
 Perfect for finding that quote you remember.
 """
     )
-    if st.button("Go to Search →", width="stretch"):
+    if st.button("Go to Search →", key="search_button", use_container_width=True):
         st.switch_page("pages/2_🔍_Semantic_Search.py")
 
 with col3:
@@ -125,8 +134,24 @@ Query the {db_type.upper()} database directly:
 Perfect for advanced analysis and exports.
 """
     )
-    if st.button("Go to Database →", width="stretch"):
+    if st.button("Go to Database →", key="db_button", use_container_width=True):
         st.switch_page("pages/3_🗄️_Database_Explorer.py")
+
+with col4:
+    st.subheader("🕸️ Author Network")
+    st.markdown(
+        """
+Explore author influence networks:
+- Interactive influence graphs
+- Most influential authors
+- Literary connections
+- Author biographies
+
+Perfect for discovering literary genealogies.
+"""
+    )
+    if st.button("Go to Network →", key="network_button", use_container_width=True):
+        st.switch_page("pages/4_🕸️_Author_Network.py")
 
 st.markdown("---")
 

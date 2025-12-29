@@ -104,6 +104,37 @@ CREATE TABLE IF NOT EXISTS author_movements (
     FOREIGN KEY (movement_id) REFERENCES literary_movements(id) ON DELETE CASCADE
 );
 
+-- Book-Movement relationship
+CREATE TABLE IF NOT EXISTS book_movements (
+    book_id TEXT NOT NULL,
+    movement_id TEXT NOT NULL,
+    source TEXT NOT NULL,  -- 'wikidata', 'manual', 'llm'
+    PRIMARY KEY (book_id, movement_id),
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+    FOREIGN KEY (movement_id) REFERENCES literary_movements(id) ON DELETE CASCADE
+);
+
+-- Awards table
+CREATE TABLE IF NOT EXISTS awards (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    category TEXT,  -- 'literary', 'genre-specific', etc.
+    established_year INTEGER
+);
+
+-- Book-Award relationship
+CREATE TABLE IF NOT EXISTS book_awards (
+    book_id TEXT NOT NULL,
+    award_id TEXT NOT NULL,
+    year_won INTEGER,
+    category TEXT,  -- Award category if applicable
+    source TEXT NOT NULL,  -- 'wikidata', 'manual', 'llm'
+    PRIMARY KEY (book_id, award_id),
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+    FOREIGN KEY (award_id) REFERENCES awards(id) ON DELETE CASCADE
+);
+
 -- Notes table - references to excerpts with their vector positions
 -- Using SERIAL for auto-incrementing integer primary key (PostgreSQL equivalent of AUTOINCREMENT)
 CREATE TABLE IF NOT EXISTS notes (
@@ -172,6 +203,12 @@ CREATE INDEX IF NOT EXISTS idx_book_authors_author_id ON book_authors(author_id)
 CREATE INDEX IF NOT EXISTS idx_book_subjects_book_id ON book_subjects(book_id);
 CREATE INDEX IF NOT EXISTS idx_book_subjects_subject_id ON book_subjects(subject_id);
 CREATE INDEX IF NOT EXISTS idx_book_subjects_source ON book_subjects(source);
+CREATE INDEX IF NOT EXISTS idx_book_movements_book_id ON book_movements(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_movements_movement_id ON book_movements(movement_id);
+CREATE INDEX IF NOT EXISTS idx_book_movements_source ON book_movements(source);
+CREATE INDEX IF NOT EXISTS idx_book_awards_book_id ON book_awards(book_id);
+CREATE INDEX IF NOT EXISTS idx_book_awards_award_id ON book_awards(award_id);
+CREATE INDEX IF NOT EXISTS idx_book_awards_source ON book_awards(source);
 CREATE INDEX IF NOT EXISTS idx_authors_name_parts ON authors(first_name, last_name);
 CREATE INDEX IF NOT EXISTS idx_books_openlibrary_id ON books(openlibrary_id);
 CREATE INDEX IF NOT EXISTS idx_books_wikidata_id ON books(wikidata_id);
