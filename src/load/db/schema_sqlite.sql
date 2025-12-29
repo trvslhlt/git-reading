@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS books (
     description TEXT,
     cover_url TEXT,
 
+    -- Reading tracking
+    date_read TIMESTAMP,
+
     -- External IDs for cross-referencing
     openlibrary_id TEXT,
     wikidata_id TEXT,
@@ -212,6 +215,7 @@ CREATE INDEX IF NOT EXISTS idx_authors_name_parts ON authors(first_name, last_na
 CREATE INDEX IF NOT EXISTS idx_books_openlibrary_id ON books(openlibrary_id);
 CREATE INDEX IF NOT EXISTS idx_books_wikidata_id ON books(wikidata_id);
 CREATE INDEX IF NOT EXISTS idx_books_isbn_13 ON books(isbn_13);
+CREATE INDEX IF NOT EXISTS idx_books_date_read ON books(date_read);
 CREATE INDEX IF NOT EXISTS idx_authors_wikidata_id ON authors(wikidata_id);
 CREATE INDEX IF NOT EXISTS idx_authors_viaf_id ON authors(viaf_id);
 CREATE INDEX IF NOT EXISTS idx_enrichment_log_entity ON enrichment_log(entity_type, entity_id);

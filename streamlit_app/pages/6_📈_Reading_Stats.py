@@ -35,6 +35,7 @@ def load_reading_stats():
                 b.id,
                 b.title,
                 b.publication_year,
+                b.date_read,
                 b.isbn_13,
                 a.name as author_name,
                 a.first_name,
@@ -159,18 +160,11 @@ def main():
     with col3:
         st.metric("Award Winners", stats["books_with_awards"])
 
-    # Note about temporal analysis
-    st.info(
-        "**Note:** Temporal analysis (reading patterns over time) is not available because "
-        "the database schema doesn't store when books were read. "
-        "This information would need to be added to enable time-based statistics."
-    )
+    # Temporal Analysis
+    # Filter books with read dates
+    dated_books = [b for b in books if b.get("date_read")]
 
-    # Temporal Analysis - Disabled for now
-    # Filter books with read dates - None will have dates since schema doesn't include it
-    dated_books = []
-
-    if False and dated_books:  # Disabled until date_read is added to schema
+    if dated_books:
         # Parse dates
         try:
             book_dates = []
@@ -235,7 +229,10 @@ def main():
         except Exception as e:
             st.error(f"Error processing reading dates: {e}")
     else:
-        st.info("No books with read dates found")
+        st.info(
+            "No books with read dates found. Reading dates are extracted from git history "
+            "when books are first added to your notes."
+        )
 
     # Author Demographics
     st.header("Author Demographics")
@@ -338,47 +335,47 @@ def main():
         decade_data = dict(top_decades)
         st.bar_chart(decade_data)
 
-        # Publication age analysis - Disabled (needs date_read)
-        if False:  # Disabled until date_read is added to schema
-            st.subheader("Book Age When Read")
+        # Publication age analysis
+        st.subheader("Book Age When Read")
 
-            books_with_both_dates = []
+        # Filter books with both publication year and date_read
+        books_with_both_dates = [b for b in books_with_pub_year if b.get("date_read")]
 
-            if books_with_both_dates:
-                ages = []
-                for book in books_with_both_dates:
-                    try:
-                        read_year = datetime.fromisoformat(book["date_read"]).year
-                        pub_year = book["publication_year"]
-                        age = read_year - pub_year
-                        if -5 < age < 500:  # Sanity check
-                            ages.append((book["title"], age))
-                    except (ValueError, TypeError):
-                        continue
+        if books_with_both_dates:
+            ages = []
+            for book in books_with_both_dates:
+                try:
+                    read_year = datetime.fromisoformat(book["date_read"]).year
+                    pub_year = book["publication_year"]
+                    age = read_year - pub_year
+                    if -5 < age < 500:  # Sanity check
+                        ages.append((book["title"], age))
+                except (ValueError, TypeError):
+                    continue
 
-                if ages:
-                    avg_age = sum(age for _, age in ages) / len(ages)
+            if ages:
+                avg_age = sum(age for _, age in ages) / len(ages)
 
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Books Analyzed", len(ages))
-                    with col2:
-                        st.metric("Avg. Age When Read", f"{avg_age:.1f} years")
-                    with col3:
-                        oldest = max(ages, key=lambda x: x[1])
-                        st.metric("Oldest Book Read", f"{oldest[1]} years")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Books Analyzed", len(ages))
+                with col2:
+                    st.metric("Avg. Age When Read", f"{avg_age:.1f} years")
+                with col3:
+                    oldest = max(ages, key=lambda x: x[1])
+                    st.metric("Oldest Book Read", f"{oldest[1]} years")
 
-                    # Show distribution
-                    age_ranges = {
-                        "0-5 years": len([a for _, a in ages if 0 <= a <= 5]),
-                        "6-10 years": len([a for _, a in ages if 6 <= a <= 10]),
-                        "11-25 years": len([a for _, a in ages if 11 <= a <= 25]),
-                        "26-50 years": len([a for _, a in ages if 26 <= a <= 50]),
-                        "51-100 years": len([a for _, a in ages if 51 <= a <= 100]),
-                        "100+ years": len([a for _, a in ages if a > 100]),
-                    }
+                # Show distribution
+                age_ranges = {
+                    "0-5 years": len([a for _, a in ages if 0 <= a <= 5]),
+                    "6-10 years": len([a for _, a in ages if 6 <= a <= 10]),
+                    "11-25 years": len([a for _, a in ages if 11 <= a <= 25]),
+                    "26-50 years": len([a for _, a in ages if 26 <= a <= 50]),
+                    "51-100 years": len([a for _, a in ages if 51 <= a <= 100]),
+                    "100+ years": len([a for _, a in ages if a > 100]),
+                }
 
-                    st.bar_chart(age_ranges)
+                st.bar_chart(age_ranges)
 
     # Books Per Author
     if books_per_author:

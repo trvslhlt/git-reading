@@ -53,10 +53,27 @@ class DatabaseAdapter(ABC):
     def create_schema(self) -> None:
         """Create all database tables and indexes.
 
+        This method creates the base schema. After calling this, run_migrations()
+        should be called to apply any pending schema updates.
+
         Raises:
             SchemaError: If schema creation fails
         """
         pass
+
+    def run_migrations(self) -> int:
+        """Run pending database migrations.
+
+        Returns:
+            Number of migrations applied
+
+        Raises:
+            DatabaseError: If migration fails
+        """
+        from .migrations import MigrationRunner
+
+        runner = MigrationRunner(self)
+        return runner.run_migrations()
 
     @abstractmethod
     def get_tables(self) -> list[str]:
