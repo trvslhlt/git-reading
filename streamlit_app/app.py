@@ -51,15 +51,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Quick links
-    st.markdown("**📚 Pages**")
-    st.page_link("pages/1_📊_Analytics_Overview.py", label="Analytics Overview", icon="📊")
-    st.page_link("pages/2_🔍_Semantic_Search.py", label="Semantic Search", icon="🔍")
-    st.page_link("pages/3_🗄️_Database_Explorer.py", label="Database Explorer", icon="🗄️")
-    st.page_link("pages/4_🕸️_Author_Network.py", label="Author Network", icon="🕸️")
-
-    st.markdown("---")
-
     # About section
     st.markdown("**ℹ️ About**")
     st.markdown(
@@ -85,73 +76,20 @@ Choose a page from the sidebar to get started:
 """
 )
 
-# Page descriptions
-col1, col2, col3, col4 = st.columns(4)
+# Available pages overview
+st.subheader("Available Pages")
+st.markdown(
+    """
+Use the sidebar navigation to explore different aspects of your reading data:
 
-with col1:
-    st.subheader("📊 Analytics Overview")
-    st.markdown(
-        """
-View comprehensive statistics about your reading:
-- Total books, authors, and notes
-- Reading timeline and trends
-- Author and section breakdowns
-- Search and filter by content
-
-Perfect for understanding your reading patterns.
+- **📊 Analytics Overview** - View statistics, trends, and search your notes
+- **🔍 Semantic Search** - Find passages using AI-powered meaning-based search
+- **🗄️ Database Explorer** - Query the database directly with SQL
+- **🕸️ Author Network** - Explore author influences and literary connections
+- **📚 Thematic Analysis** - Discover subjects, movements, and thematic patterns
+- **📈 Reading Stats** - Analyze temporal patterns and demographics
 """
-    )
-    if st.button("Go to Analytics →", key="analytics_button", use_container_width=True):
-        st.switch_page("pages/1_📊_Analytics_Overview.py")
-
-with col2:
-    st.subheader("🔍 Semantic Search")
-    st.markdown(
-        """
-Find passages using AI-powered search:
-- Search by meaning, not keywords
-- Filter by author or section
-- See similarity scores
-- Discover related concepts
-
-Perfect for finding that quote you remember.
-"""
-    )
-    if st.button("Go to Search →", key="search_button", use_container_width=True):
-        st.switch_page("pages/2_🔍_Semantic_Search.py")
-
-with col3:
-    st.subheader("🗄️ Database Explorer")
-    db_type = env.database_type()
-    st.markdown(
-        f"""
-Query the {db_type.upper()} database directly:
-- Browse all tables
-- Execute custom SQL queries
-- View schema and relationships
-- Export data to CSV
-
-Perfect for advanced analysis and exports.
-"""
-    )
-    if st.button("Go to Database →", key="db_button", use_container_width=True):
-        st.switch_page("pages/3_🗄️_Database_Explorer.py")
-
-with col4:
-    st.subheader("🕸️ Author Network")
-    st.markdown(
-        """
-Explore author influence networks:
-- Interactive influence graphs
-- Most influential authors
-- Literary connections
-- Author biographies
-
-Perfect for discovering literary genealogies.
-"""
-    )
-    if st.button("Go to Network →", key="network_button", use_container_width=True):
-        st.switch_page("pages/4_🕸️_Author_Network.py")
+)
 
 st.markdown("---")
 

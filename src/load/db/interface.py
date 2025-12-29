@@ -215,6 +215,27 @@ class DatabaseAdapter(ABC):
         """
         pass
 
+    @abstractmethod
+    def string_agg(self, column: str, separator: str = ",", distinct: bool = False) -> str:
+        """Generate database-specific string aggregation SQL.
+
+        Args:
+            column: Column name to aggregate
+            separator: Separator for concatenated strings (default: ',')
+            distinct: Whether to use DISTINCT (default: False)
+
+        Returns:
+            SQL string for aggregating strings
+            - PostgreSQL: string_agg(column, separator)
+            - SQLite: GROUP_CONCAT(column)
+
+        Example:
+            >>> adapter.string_agg('bs.source', ',', distinct=True)
+            'string_agg(DISTINCT bs.source, ',')'  # PostgreSQL
+            'GROUP_CONCAT(DISTINCT bs.source)'     # SQLite
+        """
+        pass
+
     def __enter__(self):
         """Context manager entry."""
         self.connect()
