@@ -28,9 +28,18 @@ class WikidataClient(APIClient):
     API Documentation: https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service/API
     """
 
+    # API Endpoints
     SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
     ENTITY_URL = "https://www.wikidata.org/wiki/Special:EntityData/{}.json"
     SEARCH_API = "https://www.wikidata.org/w/api.php"
+
+    # Configuration constants
+    MAX_RETRIES = 3
+    RETRY_BASE_DELAY = 2  # seconds - base delay for exponential backoff
+    SPARQL_TIMEOUT = 60  # seconds
+    SEARCH_API_TIMEOUT = 30  # seconds
+    ENTITY_FETCH_TIMEOUT = 30  # seconds
+    SEARCH_RESULT_LIMIT = 10  # number of search results to check
 
     def __init__(self, requests_per_minute: int = 60):
         """Initialize Wikidata client.
@@ -148,18 +157,15 @@ class WikidataClient(APIClient):
         """.format(title=title.replace('"', '\\"'), author=author.replace('"', '\\"'))
 
         # Retry logic with exponential backoff
-        max_retries = 3
-        retry_delay = 2
-
-        for attempt in range(max_retries):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 logger.debug(
-                    f"Searching Wikidata for '{title}' by {author} (attempt {attempt + 1}/{max_retries})"
+                    f"Searching Wikidata for '{title}' by {author} (attempt {attempt + 1}/{self.MAX_RETRIES})"
                 )
                 response = self.session.get(
                     self.SPARQL_ENDPOINT,
                     params={"query": query, "format": "json"},
-                    timeout=60,  # Increased from 30 to 60 seconds
+                    timeout=self.SPARQL_TIMEOUT,
                 )
                 response.raise_for_status()
 
@@ -180,18 +186,20 @@ class WikidataClient(APIClient):
                 return self._get_entity_data(wikidata_id)
 
             except requests.exceptions.Timeout:
-                if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2**attempt)
+                if attempt < self.MAX_RETRIES - 1:
+                    wait_time = self.RETRY_BASE_DELAY * (2**attempt)
                     logger.warning(
                         f"Timeout searching for '{title}', retrying in {wait_time}s "
-                        f"(attempt {attempt + 1}/{max_retries})"
+                        f"(attempt {attempt + 1}/{self.MAX_RETRIES})"
                     )
                     import time
 
                     time.sleep(wait_time)
                     continue
                 else:
-                    logger.warning(f"Wikidata timeout for '{title}' after {max_retries} attempts")
+                    logger.warning(
+                        f"Wikidata timeout for '{title}' after {self.MAX_RETRIES} attempts"
+                    )
                     return None
             except requests.exceptions.RequestException as e:
                 if hasattr(e, "response") and e.response and e.response.status_code == 429:
@@ -204,6 +212,8 @@ class WikidataClient(APIClient):
     def search_author(self, name: str) -> dict[str, Any] | None:
         """Search for an author by name.
 
+        Strategy: Try Search API first (faster, more reliable), fall back to SPARQL if needed.
+
         Args:
             name: Author name (full name preferred)
 
@@ -213,10 +223,27 @@ class WikidataClient(APIClient):
         Raises:
             APIError: If API request fails
         """
+        # Try Search API first (faster and more reliable)
+        result = self._search_author_via_api(name)
+        if result:
+            return result
+
+        # Fall back to SPARQL if Search API didn't find a match
+        logger.info(f"Search API didn't find '{name}', trying SPARQL as fallback")
+        return self._search_author_via_sparql(name)
+
+    def _search_author_via_sparql(self, name: str) -> dict[str, Any] | None:
+        """Search for an author using SPARQL (fallback when Search API fails).
+
+        Args:
+            name: Author name
+
+        Returns:
+            Wikidata entity data or None if not found
+        """
         self.rate_limiter.wait_if_needed()
 
         # Simplified SPARQL query for better performance
-        # Just find the Q-number, fetch details separately
         query = """
         SELECT ?author WHERE {{
           ?author wdt:P31 wd:Q5 ;  # instance of: human
@@ -229,18 +256,15 @@ class WikidataClient(APIClient):
         """.format(name=name.replace('"', '\\"'))
 
         # Retry logic with exponential backoff for timeouts
-        max_retries = 3
-        retry_delay = 2  # seconds
-
-        for attempt in range(max_retries):
+        for attempt in range(self.MAX_RETRIES):
             try:
                 logger.debug(
-                    f"Searching Wikidata for author '{name}' (attempt {attempt + 1}/{max_retries})"
+                    f"Searching Wikidata via SPARQL for '{name}' (attempt {attempt + 1}/{self.MAX_RETRIES})"
                 )
                 response = self.session.get(
                     self.SPARQL_ENDPOINT,
                     params={"query": query, "format": "json"},
-                    timeout=60,  # Increased from 30 to 60 seconds
+                    timeout=self.SPARQL_TIMEOUT,
                 )
                 response.raise_for_status()
 
@@ -248,7 +272,7 @@ class WikidataClient(APIClient):
                 bindings = data.get("results", {}).get("bindings", [])
 
                 if not bindings:
-                    logger.debug(f"No Wikidata results for author '{name}'")
+                    logger.debug(f"No SPARQL results for author '{name}'")
                     return None
 
                 author_uri = bindings[0].get("author", {}).get("value", "")
@@ -256,16 +280,16 @@ class WikidataClient(APIClient):
                     return None
 
                 wikidata_id = author_uri.split("/")[-1]
-                logger.debug(f"Found Wikidata entity: {wikidata_id}")
+                logger.debug(f"Found Wikidata entity via SPARQL: {wikidata_id}")
 
                 return self._get_entity_data(wikidata_id)
 
             except requests.exceptions.Timeout:
-                if attempt < max_retries - 1:
-                    wait_time = retry_delay * (2**attempt)  # Exponential backoff
+                if attempt < self.MAX_RETRIES - 1:
+                    wait_time = self.RETRY_BASE_DELAY * (2**attempt)  # Exponential backoff
                     logger.warning(
-                        f"Timeout searching for '{name}', retrying in {wait_time}s "
-                        f"(attempt {attempt + 1}/{max_retries})"
+                        f"SPARQL timeout searching for '{name}', retrying in {wait_time}s "
+                        f"(attempt {attempt + 1}/{self.MAX_RETRIES})"
                     )
                     import time
 
@@ -273,20 +297,19 @@ class WikidataClient(APIClient):
                     continue
                 else:
                     logger.warning(
-                        f"Wikidata SPARQL timeout for author '{name}' after {max_retries} attempts"
+                        f"Wikidata SPARQL timeout for author '{name}' after {self.MAX_RETRIES} attempts"
                     )
-                    logger.info(f"Falling back to Search API for '{name}'")
-                    return self._search_author_via_api(name)
+                    return None
             except requests.exceptions.RequestException as e:
                 if hasattr(e, "response") and e.response and e.response.status_code == 429:
                     raise RateLimitError("Wikidata rate limit exceeded") from e
-                logger.warning(f"Wikidata API error for author '{name}': {e}")
+                logger.warning(f"Wikidata SPARQL error for author '{name}': {e}")
                 return None
 
         return None
 
     def _search_author_via_api(self, name: str) -> dict[str, Any] | None:
-        """Search for an author using Wikidata Search API (fallback for SPARQL timeouts).
+        """Search for an author using Wikidata Search API (primary method).
 
         This method is faster and more reliable than SPARQL but requires filtering results.
 
@@ -308,10 +331,12 @@ class WikidataClient(APIClient):
                 "language": "en",
                 "type": "item",
                 "search": name,
-                "limit": 10,  # Get top 10 results to filter
+                "limit": self.SEARCH_RESULT_LIMIT,
             }
 
-            response = self.session.get(self.SEARCH_API, params=params, timeout=30)
+            response = self.session.get(
+                self.SEARCH_API, params=params, timeout=self.SEARCH_API_TIMEOUT
+            )
             response.raise_for_status()
 
             data = response.json()
@@ -388,7 +413,7 @@ class WikidataClient(APIClient):
         """
         try:
             url = self.ENTITY_URL.format(wikidata_id)
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=self.ENTITY_FETCH_TIMEOUT)
             response.raise_for_status()
 
             data = response.json()

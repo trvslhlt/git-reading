@@ -36,7 +36,10 @@ class EnrichmentOrchestrator:
 
         # Initialize clients based on requested sources
         self.openlibrary_client = OpenLibraryClient() if "openlibrary" in self.sources else None
-        self.wikidata_client = WikidataClient() if "wikidata" in self.sources else None
+        # Reduce Wikidata rate limit to 30 req/min to avoid 429 errors
+        self.wikidata_client = (
+            WikidataClient(requests_per_minute=30) if "wikidata" in self.sources else None
+        )
 
         # Initialize normalizers
         self.book_normalizer = BookNormalizer()
@@ -197,6 +200,14 @@ class EnrichmentOrchestrator:
         """
         stats = {"attempted": 0, "successful": 0, "failed": 0, "skipped": 0}
 
+        # Warn if wikidata is not in sources
+        if "wikidata" not in self.sources:
+            logger.warning(
+                f"Author enrichment requires Wikidata, but sources are: {', '.join(self.sources)}. "
+                f"Add '--sources wikidata' to enrich authors."
+            )
+            return stats
+
         # Get unenriched authors (where wikidata_id is NULL)
         query = "SELECT id, name FROM authors WHERE wikidata_id IS NULL"
         if limit:
@@ -273,6 +284,13 @@ class EnrichmentOrchestrator:
                 success = self._enrich_author_wikidata(author_id, name) or success
             except APIError as e:
                 logger.error(f"✗ Wikidata API error for author '{name}': {e}")
+        else:
+            # Log why author enrichment is being skipped
+            if "wikidata" not in self.sources:
+                logger.debug(
+                    f"Skipping author '{name}' - Wikidata not in sources. "
+                    f"(Note: Only Wikidata supports author enrichment, not {', '.join(self.sources)})"
+                )
 
         return success
 
@@ -318,7 +336,9 @@ class EnrichmentOrchestrator:
             if wikidata_id:
                 influences = self.wikidata_client.get_author_influences(wikidata_id)
                 if influences:
-                    influence_count = self._add_author_influences(author_id, influences)
+                    influence_count = self._add_author_influences(
+                        author_id, influences, wikidata_id
+                    )
 
             logger.info(
                 f"✓ Wikidata: "
@@ -731,7 +751,9 @@ class EnrichmentOrchestrator:
                 # Already exists, that's fine
                 pass
 
-    def _add_author_influences(self, author_id: str, influences: list[dict[str, str]]) -> int:
+    def _add_author_influences(
+        self, author_id: str, influences: list[dict[str, str]], author_wikidata_id: str
+    ) -> int:
         """Add author influence relationships to database.
 
         Args:
@@ -742,6 +764,7 @@ class EnrichmentOrchestrator:
                 - influencer_name: Name of the influencer
                 - influenced_id: Wikidata Q-ID of the influenced author
                 - influenced_name: Name of the influenced author
+            author_wikidata_id: Wikidata Q-ID of the author being enriched
 
         Returns:
             Number of influence relationships added
@@ -764,13 +787,13 @@ class EnrichmentOrchestrator:
                 continue
 
             # Determine which author is which
-            if influenced_id == self._get_author_wikidata_id(author_id):
+            if influenced_id == author_wikidata_id:
                 # This author was influenced by someone
                 influencer_db_id = self._get_or_create_author_from_wikidata(
                     influencer_id, influencer_name
                 )
                 influenced_db_id = author_id
-            elif influencer_id == self._get_author_wikidata_id(author_id):
+            elif influencer_id == author_wikidata_id:
                 # This author influenced someone else
                 influenced_db_id = self._get_or_create_author_from_wikidata(
                     influenced_id, influenced_name
