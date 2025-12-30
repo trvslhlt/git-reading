@@ -242,9 +242,9 @@ Markdown Notes
 
 **Documentation**:
 - `README.md` - Project overview and setup
-- `docs/ENRICHMENT_ROADMAP.md` - Enrichment phases
-- `docs/PHASE_3_ANALYTICS.md` - Analytics implementation
-- `docs/KNOWN_ISSUES.md` - Known issues (all resolved)
+- `docs/work/ENRICHMENT_ROADMAP.md` - Enrichment phases
+- `docs/work/PHASE_3_ANALYTICS.md` - Analytics implementation
+- `docs/work/KNOWN_ISSUES.md` - Known issues (all resolved)
 - `docs/INCREMENTAL_EXTRACTION_PLAN.md` - Extraction design
 
 ---

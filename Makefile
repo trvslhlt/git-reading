@@ -3,10 +3,10 @@
 
 .PHONY: help install test test-cov test-cov-report lint format clean \
 	run-extract run-load run-validate run-fix run-learn-patterns \
-	run-search-build run-search-query run-search-stats run-streamlit \
+	run-search-build run-search-query run-search-stats run-streamlit run-api \
 	run-enrich run-enrich-status run-enrich-export \
-	dev-install streamlit-install search-install postgres-install \
-	streamlit search dev \
+	dev-install streamlit-install search-install postgres-install api-install \
+	streamlit search dev api \
 	postgres-up postgres-down postgres-logs postgres-status postgres-psql postgres-clean
 
 #
@@ -19,6 +19,7 @@ help:
 	@echo "Quick Start Workflows (auto-install dependencies):"
 	@echo "  make streamlit    - Install Streamlit deps and launch visualization app"
 	@echo "  make search       - Install search deps and build semantic search index"
+	@echo "  make api          - Install API deps and launch GraphQL API server"
 	@echo "  make dev          - Install dev deps and run tests"
 	@echo ""
 	@echo "Setup Commands:"
@@ -27,6 +28,7 @@ help:
 	@echo "  make streamlit-install   - Install with Streamlit visualization dependencies"
 	@echo "  make search-install      - Install with semantic search dependencies"
 	@echo "  make postgres-install    - Install with PostgreSQL dependencies"
+	@echo "  make api-install         - Install with GraphQL API dependencies"
 	@echo ""
 	@echo "Development Commands:"
 	@echo "  make test                - Run all tests with pytest"
@@ -55,6 +57,9 @@ help:
 	@echo ""
 	@echo "Visualization:"
 	@echo "  make run-streamlit       - Launch Streamlit app (requires: make streamlit-install)"
+	@echo ""
+	@echo "GraphQL API:"
+	@echo "  make run-api             - Launch GraphQL API server (requires: make api-install)"
 	@echo ""
 	@echo "PostgreSQL/Docker Commands:"
 	@echo "  make postgres-up         - Start PostgreSQL in Docker container"
@@ -118,6 +123,10 @@ postgres-install:
 	@echo "Installing with PostgreSQL dependencies..."
 	uv pip install -e ".[postgresql]"
 
+api-install:
+	@echo "Installing with GraphQL API dependencies..."
+	uv pip install -e ".[api]"
+
 #
 # Quick Start Workflows (auto-install dependencies)
 #
@@ -133,6 +142,10 @@ search: search-install
 # Install dev dependencies and run tests
 dev: dev-install
 	@$(MAKE) test
+
+# Install API dependencies and launch GraphQL API server
+api: api-install
+	@$(MAKE) run-api
 
 #
 # Development
@@ -388,6 +401,26 @@ run-enrich-export:
 run-streamlit:
 	@echo "Launching Streamlit app at http://localhost:8501..."
 	uv run streamlit run streamlit_app/app.py
+
+#
+# GraphQL API
+#
+
+# Launch GraphQL API server
+# Requires: make api-install (or use: make api)
+# Accessible at:
+#   - GraphQL Playground: http://localhost:8000/graphql
+#   - Health Check: http://localhost:8000/health
+#   - API Docs: http://localhost:8000/docs
+# Usage: make run-api
+run-api:
+	@echo "Launching GraphQL API server..."
+	@echo "  GraphQL Playground: http://localhost:8000/graphql"
+	@echo "  Health Check: http://localhost:8000/health"
+	@echo "  API Docs: http://localhost:8000/docs"
+	@echo ""
+	@(sleep 2 && python3 -m webbrowser http://localhost:8000/graphql) &
+	PYTHONPATH=src uv run uvicorn api.main:app --reload --port 8000
 
 #
 # PostgreSQL/Docker Management
