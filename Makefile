@@ -419,6 +419,7 @@ run-api:
 	@echo "  Health Check: http://localhost:8000/health"
 	@echo "  API Docs: http://localhost:8000/docs"
 	@echo ""
+	@(sleep 2 && python3 -m webbrowser http://localhost:8000/graphql) &
 	PYTHONPATH=src uv run uvicorn api.main:app --reload --port 8000
 
 #

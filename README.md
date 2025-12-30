@@ -99,15 +99,15 @@ See [docs/ENRICHMENT_GUIDE.md](docs/ENRICHMENT_GUIDE.md) for complete reference.
 Interactive GraphQL API for building custom visualizations and graph-based explorations:
 
 ```bash
-# Quick start (auto-installs and launches)
+# Quick start (auto-installs, launches, and opens browser)
 make api
 
 # Or install dependencies first
 make api-install
-make run-api
+make run-api  # Opens GraphQL Playground in browser
 ```
 
-Access points:
+Access points (Playground opens automatically):
 - **GraphQL Playground**: http://localhost:8000/graphql
 - **Health Check**: http://localhost:8000/health
 - **API Docs**: http://localhost:8000/docs
@@ -118,7 +118,9 @@ Access points:
 - Author influence network exploration
 - Flexible GraphQL queries for custom views
 
-See [src/api/README.md](src/api/README.md) for complete API documentation and query examples.
+**Documentation:**
+- **[API Usage Guide](docs/API_USAGE.md)** - Examples with sample requests/responses
+- [API README](src/api/README.md) - Complete API reference and schema
 
 ### Visualization
 

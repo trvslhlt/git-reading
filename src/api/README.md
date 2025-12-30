@@ -8,6 +8,8 @@ GraphQL API for exploring reading data through interactive graphs.
 - **Author Search**: Search for authors by name
 - **Flexible Queries**: Fetch individual authors or books with all their metadata
 
+**📖 For detailed usage examples with sample requests/responses, see [API Usage Guide](../../docs/API_USAGE.md)**
+
 ## Quick Start
 
 ### Installation
@@ -23,12 +25,18 @@ uv pip install -e ".[api]"
 Start the API server:
 
 ```bash
+make run-api  # Auto-opens GraphQL Playground in browser
+```
+
+Or run manually:
+
+```bash
 PYTHONPATH=src uv run uvicorn api.main:app --reload --port 8000
 ```
 
 The server will start at:
 - API: http://localhost:8000
-- GraphQL Playground: http://localhost:8000/graphql
+- GraphQL Playground: http://localhost:8000/graphql (opens automatically with `make run-api`)
 - Health Check: http://localhost:8000/health
 - API Docs: http://localhost:8000/docs
 
@@ -289,6 +297,7 @@ With the API running, you can now:
 
 ## Related Documentation
 
+- **[API Usage Guide](../../docs/API_USAGE.md)** - Detailed examples with sample requests/responses
 - [Project Overview](../../README.md)
 - [Enrichment Roadmap](../../docs/ENRICHMENT_ROADMAP.md)
 - [Project Phases](../../docs/PROJECT_PHASES.md)
