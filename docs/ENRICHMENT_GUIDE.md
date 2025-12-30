@@ -283,6 +283,6 @@ These are safe to run multiple times (uses `CREATE TABLE IF NOT EXISTS`).
 
 ## See Also
 
-- [ENRICHMENT_ROADMAP.md](ENRICHMENT_ROADMAP.md) - Full roadmap and technical details
+- [ENRICHMENT_ROADMAP.md](work/ENRICHMENT_ROADMAP.md) - Full roadmap and technical details
 - [Makefile](../Makefile) - All available commands
 - `make run-enrich ARGS='--help'` - Complete CLI reference

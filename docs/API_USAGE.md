@@ -858,7 +858,7 @@ If queries return empty data:
 - [API README](../src/api/README.md) - API implementation details
 - [Enrichment Guide](ENRICHMENT_GUIDE.md) - How to populate metadata
 - [Database Documentation](DATABASE.md) - Database schema and setup
-- [Project Phases](PROJECT_PHASES.md) - Overall project roadmap
+- [Project Phases](work/PROJECT_PHASES.md) - Overall project roadmap
 
 ---
 

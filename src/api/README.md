@@ -299,5 +299,5 @@ With the API running, you can now:
 
 - **[API Usage Guide](../../docs/API_USAGE.md)** - Detailed examples with sample requests/responses
 - [Project Overview](../../README.md)
-- [Enrichment Roadmap](../../docs/ENRICHMENT_ROADMAP.md)
-- [Project Phases](../../docs/PROJECT_PHASES.md)
+- [Enrichment Roadmap](../../docs/work/ENRICHMENT_ROADMAP.md)
+- [Project Phases](../../docs/work/PROJECT_PHASES.md)
