@@ -41,6 +41,11 @@ search = [
 postgresql = [
     "psycopg[binary,pool]>=3.1.0",  # PostgreSQL driver with connection pooling
 ]
+api = [
+    "fastapi>=0.104.0",
+    "strawberry-graphql[fastapi]>=0.217.0",
+    "uvicorn[standard]>=0.24.0",
+]
 
 [project.scripts]
 extract = "extract.cli:main"
@@ -55,6 +60,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
+    "src/api",
     "src/common",
     "src/extract",
     "src/enrich",
@@ -91,7 +97,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "extract", "enrich", "load", "normalize_source", "query", "transform", "search"]
+known-first-party = ["api", "common", "extract", "enrich", "load", "normalize_source", "query", "transform", "search"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B", "F401", "F811", "E402"]

@@ -94,6 +94,32 @@ make run-enrich ARGS='--sources openlibrary wikidata --entity-type both'
 
 See [docs/ENRICHMENT_GUIDE.md](docs/ENRICHMENT_GUIDE.md) for complete reference.
 
+### GraphQL API
+
+Interactive GraphQL API for building custom visualizations and graph-based explorations:
+
+```bash
+# Quick start (auto-installs and launches)
+make api
+
+# Or install dependencies first
+make api-install
+make run-api
+```
+
+Access points:
+- **GraphQL Playground**: http://localhost:8000/graphql
+- **Health Check**: http://localhost:8000/health
+- **API Docs**: http://localhost:8000/docs
+
+**Features:**
+- Author-Book graph visualization queries
+- Author search with partial matching
+- Author influence network exploration
+- Flexible GraphQL queries for custom views
+
+See [src/api/README.md](src/api/README.md) for complete API documentation and query examples.
+
 ### Visualization
 
 Interactive dashboard for exploring your indexed books:
