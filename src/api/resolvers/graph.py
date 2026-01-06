@@ -2,7 +2,7 @@
 
 import strawberry
 
-from api.types import Author, Book, Graph, GraphEdge, GraphNode, NodeMetadata
+from api.types import Author, Book, Graph, GraphEdge, GraphNode, NodeMetadata, Subject
 from load.db.factory import get_adapter
 
 
@@ -175,10 +175,12 @@ class Query:
                     birth_year=row.get("birth_year"),
                     death_year=row.get("death_year"),
                     birth_place=row.get("birth_place"),
+                    death_place=row.get("death_place"),
                     nationality=row.get("nationality"),
                     bio=row.get("bio"),
                     wikidata_id=row.get("wikidata_id"),
                     viaf_id=row.get("viaf_id"),
+                    wikipedia_url=row.get("wikipedia_url"),
                 )
                 for row in results
             ]
@@ -215,10 +217,12 @@ class Query:
                 birth_year=row.get("birth_year"),
                 death_year=row.get("death_year"),
                 birth_place=row.get("birth_place"),
+                death_place=row.get("death_place"),
                 nationality=row.get("nationality"),
                 bio=row.get("bio"),
                 wikidata_id=row.get("wikidata_id"),
                 viaf_id=row.get("viaf_id"),
+                wikipedia_url=row.get("wikipedia_url"),
             )
 
         finally:
@@ -245,6 +249,15 @@ class Query:
             if not row:
                 return None
 
+            # Get subjects for this book
+            subjects_query = f"""
+                SELECT s.name, bs.source FROM subjects s
+                JOIN book_subjects bs ON s.id = bs.subject_id
+                WHERE bs.book_id = {adapter.placeholder}
+            """
+            subject_rows = adapter.fetchall(subjects_query, (id,))
+            subjects = [Subject(name=s["name"], source=s.get("source")) for s in subject_rows]
+
             return Book(
                 id=row["id"],
                 title=row["title"],
@@ -254,7 +267,68 @@ class Query:
                 isbn_10=row.get("isbn_10"),
                 openlibrary_id=row.get("openlibrary_id"),
                 wikidata_id=row.get("wikidata_id"),
+                description=row.get("description"),
+                cover_url=row.get("cover_url"),
+                subjects=subjects,
             )
+
+        finally:
+            adapter.close()
+
+    @strawberry.field
+    def search_books_by_subject(self, subject: str, limit: int = 20) -> list[Book]:
+        """
+        Search for books by subject/tag.
+
+        Args:
+            subject: Subject name to search for (partial matching)
+            limit: Maximum number of results to return
+
+        Returns:
+            List of matching books
+        """
+        adapter = get_adapter()
+        adapter.connect()
+
+        try:
+            search_query = f"""
+                SELECT DISTINCT b.* FROM books b
+                JOIN book_subjects bs ON b.id = bs.book_id
+                JOIN subjects s ON bs.subject_id = s.id
+                WHERE s.name ILIKE {adapter.placeholder}
+                ORDER BY b.title
+                LIMIT {adapter.placeholder}
+            """
+            results = adapter.fetchall(search_query, (f"%{subject}%", limit))
+
+            books = []
+            for row in results:
+                # Get subjects for this book
+                subjects_query = f"""
+                    SELECT s.name, bs.source FROM subjects s
+                    JOIN book_subjects bs ON s.id = bs.subject_id
+                    WHERE bs.book_id = {adapter.placeholder}
+                """
+                subject_rows = adapter.fetchall(subjects_query, (row["id"],))
+                subjects = [Subject(name=s["name"], source=s.get("source")) for s in subject_rows]
+
+                books.append(
+                    Book(
+                        id=row["id"],
+                        title=row["title"],
+                        publication_year=row.get("publication_year"),
+                        date_read=row.get("date_read"),
+                        isbn_13=row.get("isbn_13"),
+                        isbn_10=row.get("isbn_10"),
+                        openlibrary_id=row.get("openlibrary_id"),
+                        wikidata_id=row.get("wikidata_id"),
+                        description=row.get("description"),
+                        cover_url=row.get("cover_url"),
+                        subjects=subjects,
+                    )
+                )
+
+            return books
 
         finally:
             adapter.close()

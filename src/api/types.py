@@ -23,10 +23,20 @@ class Author:
     birth_year: int | None = None
     death_year: int | None = None
     birth_place: str | None = None
+    death_place: str | None = None
     nationality: str | None = None
     bio: str | None = None
     wikidata_id: str | None = None
     viaf_id: str | None = None
+    wikipedia_url: str | None = None
+
+
+@strawberry.type
+class Subject:
+    """Subject/tag associated with a book."""
+
+    name: str
+    source: str | None = None
 
 
 @strawberry.type
@@ -41,6 +51,9 @@ class Book:
     isbn_10: str | None = None
     openlibrary_id: str | None = None
     wikidata_id: str | None = None
+    description: str | None = None
+    cover_url: str | None = None
+    subjects: list[Subject] = strawberry.field(default_factory=list)
 
 
 @strawberry.type
